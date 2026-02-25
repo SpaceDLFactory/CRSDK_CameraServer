@@ -111,7 +111,6 @@ fn main() {
 - [x] C-Shim Bridge for C++ Namespace Handling (`SCRSDK`)
 - [x] Basic SDK Initialization & Version Check
 - [ ] Camera Device Enumeration (`EnumCameraObjects`)
-- [ ] LiveView Stream Data Handling for YOLO/ByteTrack
 - [ ] Remote Shutter & PTZF (Pan/Tilt/Zoom/Focus) Automation
 - [ ] SDL Factory: Deep Learning based Astronomical Tracking System
 
