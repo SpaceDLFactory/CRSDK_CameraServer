@@ -1,7 +1,7 @@
 # ARCHITECTURE — CrSDK Rust Wrapper + 테더링 서버
 
 전체 맥락용 문서. lib(`crsdk`) + 서버(`crsdk_server`) + 웹 UI를 한눈에.
-(lib 내부 설계 이력은 `design_v5.md`, 단계별 로드맵은 `PLAN.md` 참조.)
+(기능 현황은 `STATUS.md` 참조.)
 
 ## 1. 큰 그림
 
@@ -130,7 +130,8 @@ cargo run -p crsdk_server     # http://localhost:8080/web/index.html
 ## 10. 알려진 부채 / 다음 후보
 
 - LiveView 단일 클라이언트 / 해상도 변경 시 버퍼 재할당 미처리
-- USB 억제기 example/server 중복 → lib `crsdk::platform`으로 DRY 여지
-- AF 셔터는 시간 기반(500ms). 합초 실패율 높으면 FocusIndication(0x0707) 폴링으로 전환
+- AF 셔터는 시간 기반(500ms) — FocusIndication(0x0707)으로 합초 확인 가능
 - ExposureProgramMode(PASM)는 A7C 물리 다이얼이라 SDK 쓰기 불가 (allowed 비어 비활성)
-- 미구현: 촬영 미리보기, 배터리/저장공간 표시, 재연결, RAW 압축/JPEG 품질, LV 피킹/확대
+- AF 좌표 보정(`calib_y`)은 FocusArea=M 기준 실측표 — 세션 간 ~5% 변동 가능
+- 다음 후보: 히스토그램, 100% 확대 초점확인, 바디 추상화(멀티바디), WiFi/SSH
+- (기능 현황 전체는 `STATUS.md`)
