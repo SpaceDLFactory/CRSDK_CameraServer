@@ -310,6 +310,28 @@ async fn debug_all_codes(State(s): State<AppState>) -> Response {
     }
 }
 
+/// 연결된 바디가 노출하는 속성 코드 집합 + 모델명 — 프론트가 UI를 큐레이션한다.
+async fn capabilities(State(s): State<AppState>) -> Response {
+    let (handle, model) = {
+        let g = s.camera.lock().await;
+        match &*g {
+            Some(c) => (c.0.device_handle(), c.1.clone()),
+            None => return (StatusCode::SERVICE_UNAVAILABLE, "not connected").into_response(),
+        }
+    };
+    match tokio::task::spawn_blocking(move || crsdk::capability::Capabilities::probe(handle, model))
+        .await
+    {
+        Ok(Ok(caps)) => Json(serde_json::json!({
+            "model": caps.model,
+            "supported": caps.supported.iter().map(|c| format!("0x{c:04X}")).collect::<Vec<_>>(),
+        }))
+        .into_response(),
+        Ok(Err(e)) => (StatusCode::INTERNAL_SERVER_ERROR, format!("sdk: {e:?}")).into_response(),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, format!("task: {e}")).into_response(),
+    }
+}
+
 async fn focus_nearfar_info(State(s): State<AppState>) -> Response {
     let handle = {
         let guard = s.camera.lock().await;
@@ -720,36 +742,63 @@ async fn last_image(State(s): State<AppState>) -> Response {
 #[derive(Deserialize)]
 struct AfPoint { x: f64, y: f64, #[serde(default)] area: Option<u64> }
 
-// AF Y축 보정표: 실측 (cmd_y, 카메라가 실제 놓은 y_num). 카메라가 cmd→실위치를
-// S커브로 매핑(중앙 압축)하므로, 클릭 ny를 박스 도달범위[28,297]에 선형 대응시키는
-// 목표 y_num을 역보간해 cmd_y를 구한다. FocusArea=M 기준 실측 (다른 크기도 근사 사용).
-const AF_Y_CAL: [(f64, f64); 5] =
+// AF 좌표 보정 — 바디마다 라이브뷰 좌표계/매핑이 다르다. 모델별 테이블로 키화한다.
+// 좌표범위(x_max/y_max)는 SDK AF 그리드 기준 640×480 공통; y_cal만 바디별 실측이다.
+struct AfCalib {
+    x_max: u32,                   // X 좌표 최대 (0..=x_max)
+    y_max: u32,                   // Y 좌표 최대 (선형 폴백 시 사용)
+    y_cal: &'static [(f64, f64)], // (cmd_y, 실측 y_num) S커브 역보정표. 비면 선형.
+}
+
+// A7C 실측 (cmd_y, 카메라가 실제 놓은 y_num). 카메라가 cmd→실위치를 S커브로
+// 매핑(중앙 압축)하므로, 클릭 ny를 박스 도달범위[28,297]에 선형 대응시키는 목표
+// y_num을 역보간해 cmd_y를 구한다. FocusArea=M 기준 실측 (다른 크기도 근사 사용).
+const A7C_Y_CAL: [(f64, f64); 5] =
     [(0.0, 28.0), (120.0, 66.0), (240.0, 162.0), (359.0, 256.0), (479.0, 297.0)];
 
-fn calib_y(ny: f64) -> u32 {
-    let (amin, amax) = (AF_Y_CAL[0].1, AF_Y_CAL[AF_Y_CAL.len() - 1].1);
-    let target = amin + ny.clamp(0.0, 1.0) * (amax - amin); // 도달범위에 선형 대응
-    for w in AF_Y_CAL.windows(2) {
-        let (c0, a0) = w[0];
-        let (c1, a1) = w[1];
-        if target <= a1 {
-            let t = (target - a0) / (a1 - a0);
-            return (c0 + t * (c1 - c0)).round() as u32;
-        }
+/// 연결된 모델에 맞는 AF 보정. 미측정 바디는 선형 폴백.
+fn af_calib(model: &str) -> AfCalib {
+    if model.eq_ignore_ascii_case("ILCE-7C") {
+        AfCalib { x_max: 639, y_max: 479, y_cal: &A7C_Y_CAL }
+    } else {
+        AfCalib { x_max: 639, y_max: 479, y_cal: &[] } // 미측정: 선형 매핑
     }
-    AF_Y_CAL[AF_Y_CAL.len() - 1].0 as u32
+}
+
+impl AfCalib {
+    fn x(&self, nx: f64) -> u32 {
+        (nx.clamp(0.0, 1.0) * self.x_max as f64).round() as u32
+    }
+    fn y(&self, ny: f64) -> u32 {
+        let cal = self.y_cal;
+        if cal.len() < 2 {
+            return (ny.clamp(0.0, 1.0) * self.y_max as f64).round() as u32;
+        }
+        let (amin, amax) = (cal[0].1, cal[cal.len() - 1].1);
+        let target = amin + ny.clamp(0.0, 1.0) * (amax - amin); // 도달범위에 선형 대응
+        for w in cal.windows(2) {
+            let (c0, a0) = w[0];
+            let (c1, a1) = w[1];
+            if target <= a1 {
+                let t = (target - a0) / (a1 - a0);
+                return (c0 + t * (c1 - c0)).round() as u32;
+            }
+        }
+        cal[cal.len() - 1].0 as u32
+    }
 }
 
 async fn af_point(State(s): State<AppState>, Json(b): Json<AfPoint>) -> impl IntoResponse {
-    let handle = {
+    let (handle, model) = {
         let g = s.camera.lock().await;
         match &*g {
-            Some(c) => c.0.device_handle(),
+            Some(c) => (c.0.device_handle(), c.1.clone()),
             None => return (StatusCode::SERVICE_UNAVAILABLE, "not connected".to_string()),
         }
     };
-    let x = (b.x.clamp(0.0, 1.0) * 639.0).round() as u32;
-    let y = calib_y(b.y); // Y는 S커브 역보정
+    let cal = af_calib(&model);
+    let x = cal.x(b.x);
+    let y = cal.y(b.y); // Y는 S커브 역보정 (모델별)
     let packed = ((x << 16) | y) as u64;
     // Flexible Spot 크기: S(4)/M(5)/L(6)만 허용, 그 외엔 S.
     let area = match b.area {
@@ -1084,6 +1133,7 @@ async fn main() {
         .route("/api/savepath", post(set_save_path))
         .route("/api/focus_nearfar", post(focus_near_far))
         .route("/api/focus_nearfar/info", get(focus_nearfar_info))
+        .route("/api/capabilities", get(capabilities))
         .route("/api/_debug/codes", get(debug_all_codes))
         .route("/events", get(events))
         .route("/lv", get(liveview))

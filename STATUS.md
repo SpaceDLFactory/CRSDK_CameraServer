@@ -122,10 +122,10 @@ cargo run -p crsdk_server     # http://localhost:8080/web/index.html
 **현황**: 이미 `find(code)`→Option/None = 런타임 capability(바디가 property 노출하나). 이걸 명시화 + 모델별 보정 + 프론트 큐레이션으로 끌어올림.
 
 **계획(증분)**:
-1. lib `src/capability.rs`: `Capabilities { model, supported: BTreeSet<u32> }` + `probe(handle)`(get_all로 코드 수집 + 모델) + `has(code)`. 토대.
-2. 서버 `/api/capabilities` 엔드포인트 (model + supported codes) → 프론트가 UI 큐레이션.
-3. **AF 보정 모델별 키화**: `AF_Y_CAL`(main.rs)을 모델별 테이블로. A7C=실측표, 미측정 바디=선형 폴백. 좌표범위(639/479)도 capability/모델 기준.
-4. 프론트: 컨트롤 노출/그룹을 capabilities로 구동 (드롭다운 변종 도배 → 큐레이션). 현재 label-dedup은 임시.
+1. ✅ lib `src/capability.rs`: `Capabilities { model, supported: BTreeSet<u32> }` + `probe(handle, model)`(get_all로 코드 수집) + `has(code)`. 토대.
+2. ✅ 서버 `/api/capabilities` 엔드포인트 (model + supported codes hex) → 프론트가 UI 큐레이션.
+3. ✅ **AF 보정 모델별 키화**: `AfCalib{x_max,y_max,y_cal}` + `af_calib(model)`. A7C(`ILCE-7C`)=실측표(`A7C_Y_CAL`), 미측정 바디=선형 폴백. `af_point`가 연결 모델로 보정.
+4. 프론트: 컨트롤 노출/그룹을 capabilities로 구동 (드롭다운 변종 도배 → 큐레이션). 현재 label-dedup은 임시. ← 다음
 5. 소프트웨어 폴백(벌브타이머·인터벌)은 capability "네이티브 미지원" 분기로 일원화.
 
 **하드코딩 지점**(리팩터 대상): `crsdk_server/src/main.rs` AF_Y_CAL/calib_y/639/479/FLEXIBLE_SPOT, `src/properties.rs` 코드 주석(A7C 노출/미노출), PropertiesDto 21× find(), web/index.html 29× capability 분기.
