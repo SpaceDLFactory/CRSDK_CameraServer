@@ -418,7 +418,7 @@
         <button class="btn" id="peakBtn" type="button">피킹 OFF</button>
         <button class="btn" id="afCenterBtn" type="button">AF 중앙</button>
       </div>
-      <div class="row" style="margin-top:6px;"><span class="k">AF 영역</span><select class="sel" id="afSize"><option value="4">플렉서블 S</option><option value="5">플렉서블 M</option><option value="6">플렉서블 L</option></select></div>
+      <div class="row" style="margin-top:6px;"><span class="k">AF 영역</span><select class="sel" id="afSize" data-code="275"><option value="4">플렉서블 S</option><option value="5">플렉서블 M</option><option value="6">플렉서블 L</option></select></div>
       <button class="btn" id="halfBtn" type="button" style="width:100%;margin-top:6px;">반셔터 (누르고 유지 → AF)</button>
       <div class="row" style="margin-top:6px;color:var(--fg-mute);font-size:10px;">
         <span>AF 포인트: LiveView 클릭 (기본 중앙)</span>
@@ -488,6 +488,34 @@
   const savePathIn = document.getElementById('savePathIn');
   const savePathApply = document.getElementById('savePathApply');
 
+  // ── 바디 capability 큐레이션 (연결당 1회) ─────────────────────────────
+  // /api/capabilities의 supported 코드로 미지원 컨트롤 행/카드를 숨긴다.
+  // 미지원 = 바디가 property 자체를 노출 안 함 → 비활성 '—' 대신 행 제거.
+  let capsApplied = false;
+  const applyCapabilities = async () => {
+    if (capsApplied) return;
+    let supported;
+    try {
+      const r = await fetch('/api/capabilities', { cache: 'no-store' });
+      if (!r.ok) return;                 // 미연결 등 → 다음 폴에서 재시도
+      const d = await r.json();
+      supported = new Set((d.supported || []).map(h => parseInt(h, 16)));
+    } catch (e) { return; }
+    capsApplied = true;
+    // data-code 보유 컨트롤: 미지원이면 소속 .row 숨김
+    document.querySelectorAll('.sel[data-code]').forEach(sel => {
+      const row = sel.closest('.row');
+      if (row) row.style.display = supported.has(Number(sel.dataset.code)) ? '' : 'none';
+    });
+    // property-row만으로 구성된(버튼 없는) 카드: 보이는 행이 없으면 카드 숨김
+    document.querySelectorAll('.panel .card').forEach(card => {
+      const rows = card.querySelectorAll('.row');
+      if (!rows.length || card.querySelector('button')) return; // 버튼 카드는 유지
+      const anyVisible = [...rows].some(r => r.style.display !== 'none');
+      card.style.display = anyVisible ? '' : 'none';
+    });
+  };
+
   const renderStatus = (st) => {
     if (st.state === 'connected') {
       dot.style.background = 'var(--ok)';
@@ -502,12 +530,14 @@
       }
       startLiveView();
       setupNearFar();   // 카메라 연결 시 NearFar 범위 1회 받아 슬라이더 설정
+      applyCapabilities();
     } else {
       topLeft.innerHTML =
         `<span class="dot" style="background:#ef4444"></span>` +
         `<span><strong>DISCONNECTED</strong></span>` +
         `<span>· click CAPTURE → /api/connect 재시도</span>`;
       stopLiveView();
+      capsApplied = false;   // 재연결(다른 바디 가능) 시 다시 큐레이션
     }
   };
   const pollStatus = async () => {

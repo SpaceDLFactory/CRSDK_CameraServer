@@ -125,7 +125,7 @@ cargo run -p crsdk_server     # http://localhost:8080/web/index.html
 1. ✅ lib `src/capability.rs`: `Capabilities { model, supported: BTreeSet<u32> }` + `probe(handle, model)`(get_all로 코드 수집) + `has(code)`. 토대.
 2. ✅ 서버 `/api/capabilities` 엔드포인트 (model + supported codes hex) → 프론트가 UI 큐레이션.
 3. ✅ **AF 보정 모델별 키화**: `AfCalib{x_max,y_max,y_cal}` + `af_calib(model)`. A7C(`ILCE-7C`)=실측표(`A7C_Y_CAL`), 미측정 바디=선형 폴백. `af_point`가 연결 모델로 보정.
-4. 프론트: 컨트롤 노출/그룹을 capabilities로 구동 (드롭다운 변종 도배 → 큐레이션). 현재 label-dedup은 임시. ← 다음
-5. 소프트웨어 폴백(벌브타이머·인터벌)은 capability "네이티브 미지원" 분기로 일원화.
+4. ✅ 프론트: 연결당 1회 `/api/capabilities` → `data-code` 보유 컨트롤의 미지원 행 숨김 + property-row만의(버튼 없는) 카드 자동 숨김. 재연결 시 재큐레이션(`capsApplied`). A7C에선 shutter_type/silent 등 미노출 행이 비활성 '—' 대신 사라짐. (주: label-dedup은 한 property의 allowed 변종 도배 해소용이라 code-level capability와 별개 — 유지)
+5. ⏸ 보류: 소프트웨어 폴백(벌브타이머·인터벌)을 "네이티브 미지원" 분기로. 네이티브 제어 UI가 없는 현재 단계에서 분기는 대체 없는 죽은 코드 → 네이티브 지원 바디 + 네이티브 UI 구현 시 함께.
 
 **하드코딩 지점**(리팩터 대상): `crsdk_server/src/main.rs` AF_Y_CAL/calib_y/639/479/FLEXIBLE_SPOT, `src/properties.rs` 코드 주석(A7C 노출/미노출), PropertiesDto 21× find(), web/index.html 29× capability 분기.
