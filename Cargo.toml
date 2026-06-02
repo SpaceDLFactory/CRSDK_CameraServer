@@ -1,11 +1,30 @@
+[workspace]
+members = ["crsdk_server"]
+
 [package]
-name = "crsdk_rust_wrapper"
+name = "crsdk"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
+description = "Sony Camera Remote SDK v2.01.00 Rust wrapper (A7C/ILCE-7C)"
+
+[[bin]]
+name = "crsdk_example"
+path = "src/main.rs"
+
+[lib]
+name = "crsdk"
+path = "src/lib.rs"
+crate-type = ["rlib"]
 
 [dependencies]
-thiserror = "2.0.18"
+thiserror = "1.0"
+ctrlc     = "3"
 
 [build-dependencies]
-bindgen = "0.72.1"
-cc = "1.0"
+cc      = "1.0"
+bindgen = "0.69"
+
+[profile.release]
+opt-level = 3
+lto       = true
+strip     = true

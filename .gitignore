@@ -1,2 +1,21 @@
+# Sony SDK (저작권 Sony — 재배포 금지, 사용자가 직접 배치)
 /CrSDK_v2.01.00_20260203a_Mac
+# SDK HTML 문서 변환본 (Sony 저작권 + 대용량)
+/html_md
+/docs_md
+
+# 빌드 산출물
 /target
+# 바이너리 배포본 (Sony dylib 포함 — 소스 리포에 미포함, scripts/make_dist.sh로 생성)
+/dist
+
+# 촬영 결과물 (대용량 RAW/JPEG)
+/captures
+
+# 로컬 툴링 상태
+/.claude
+/.omc
+
+# macOS
+.DS_Store
+/notes

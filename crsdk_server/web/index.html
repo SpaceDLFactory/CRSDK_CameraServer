@@ -1,0 +1,1085 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>CrSDK Remote — Tether Console</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg:       #1f1f1f;
+    --bg-2:     #2a2a2a;
+    --bg-3:     #303030;
+    --line:     rgba(255,255,255,0.08);
+    --line-2:   rgba(255,255,255,0.16);
+    --fg:       #e8e8e8;
+    --fg-dim:   #9b9b9b;
+    --fg-mute:  #6a6a6a;
+    --accent:   #4a9eff;  /* Capture One 파랑 */
+    --danger:   #ef4444;
+    --ok:       #4ade80;
+    --font-mono: 'SF Mono','JetBrains Mono','Menlo',monospace;
+    --font-ui:   -apple-system,system-ui,'Helvetica Neue',sans-serif;
+  }
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--font-ui);
+    font-size: 13px;
+    overflow: hidden;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* ── Layout: studio software 2-column ───────────────────────────────── */
+  .app {
+    display: grid;
+    grid-template-columns: 1fr 280px;
+    grid-template-rows: 32px 1fr;
+    grid-template-areas:
+      "topbar topbar"
+      "lv     panel";
+    height: 100dvh;
+  }
+  /* 폰 가로폭 부족 시 단일 컬럼 */
+  @media (max-width: 600px) {
+    .app {
+      grid-template-columns: 1fr;
+      grid-template-rows: 32px 1fr auto;
+      grid-template-areas:
+        "topbar"
+        "lv"
+        "panel";
+    }
+    .panel { border-left: 0; border-top: 1px solid var(--line); max-height: 280px; }
+  }
+
+  .topbar {
+    grid-area: topbar;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 12px;
+    background: var(--bg-2);
+    border-bottom: 1px solid var(--line);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--fg-dim);
+  }
+  .topbar .left, .topbar .right { display:flex; align-items:center; gap:10px; }
+  .topbar strong { color: var(--fg); font-weight: 500; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
+
+  /* ── LiveView ─────────────────────────────────────────────────────────── */
+  .lv {
+    grid-area: lv;
+    position: relative;
+    background:
+      radial-gradient(ellipse at 40% 40%, #353535 0%, #1a1a1a 60%, #0c0c0c 100%);
+    overflow: hidden;
+  }
+  .lv-img {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    object-fit: contain;
+    background: #000;
+    display: none;            /* connected 시 JS가 표시 */
+  }
+  .peak-canvas {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    pointer-events: none; display: none;
+  }
+  .peak-canvas.on { display: block; }
+  .af-marker {
+    position: absolute; width: 56px; height: 56px;
+    border: 2px solid var(--accent); border-radius: 4px;
+    transform: translate(-50%, -50%); pointer-events: none;
+    box-shadow: 0 0 0 1px rgba(0,0,0,0.5);
+    left: 50%; top: 50%;
+  }
+  .lv-rotate {
+    position: absolute; top: 8px; right: 8px; z-index: 6;
+    width: 34px; height: 34px; border-radius: 6px;
+    background: rgba(0,0,0,0.45); color: var(--fg);
+    border: 1px solid rgba(255,255,255,0.25); cursor: pointer;
+    font-size: 18px; line-height: 1;
+  }
+  .lv-rotate:hover { background: rgba(0,0,0,0.7); }
+  .lv-frame {
+    position: absolute; inset: 12px;
+    border: 1px solid var(--line);
+  }
+  .lv-thirds {
+    position: absolute; inset: 12px;
+    pointer-events: none;
+    background-image:
+      linear-gradient(to right, rgba(255,255,255,0.06) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255,255,255,0.06) 1px, transparent 1px);
+    background-size: calc((100% / 3)) 100%, 100% calc((100% / 3));
+  }
+  .lv-info {
+    position: absolute; bottom: 24px; left: 24px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--fg-dim);
+    letter-spacing: 0.05em;
+  }
+  .lv-info .v { color: var(--fg); }
+  .lv-corner-tl, .lv-corner-tr, .lv-corner-bl, .lv-corner-br {
+    position: absolute;
+    width: 18px; height: 18px;
+    border: 1.5px solid var(--accent);
+  }
+  .lv-corner-tl { top: 12px; left: 12px; border-right:0; border-bottom:0; }
+  .lv-corner-tr { top: 12px; right: 12px; border-left:0; border-bottom:0; }
+  .lv-corner-bl { bottom: 12px; left: 12px; border-right:0; border-top:0; }
+  .lv-corner-br { bottom: 12px; right: 12px; border-left:0; border-top:0; }
+
+  /* ── Right panel ──────────────────────────────────────────────────────── */
+  .panel {
+    grid-area: panel;
+    background: var(--bg-2);
+    border-left: 1px solid var(--line);
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    overflow-y: auto;
+  }
+  .card {
+    background: var(--bg-3);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 10px 12px;
+  }
+  .card h3 {
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--fg-mute);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 8px;
+  }
+  .row {
+    display: flex; justify-content: space-between; align-items: baseline;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    padding: 3px 0;
+  }
+  .row .k { color: var(--fg-dim); font-size: 11px; }
+  .row .v { color: var(--fg); }
+  .row .v.hi { color: var(--accent); }
+  .sel {
+    appearance: none; -webkit-appearance: none;
+    background: var(--bg); color: var(--fg);
+    border: 1px solid var(--line-2); border-radius: 3px;
+    font-family: var(--font-mono); font-size: 12px;
+    padding: 3px 8px; min-width: 96px; text-align: right;
+    cursor: pointer;
+  }
+  .sel:focus { outline: none; border-color: var(--accent); }
+  .sel:disabled { opacity: 0.4; cursor: default; }
+  .savepath { display: flex; gap: 6px; margin-top: 8px; }
+  .path-in {
+    flex: 1; min-width: 0;
+    background: var(--bg); color: var(--fg);
+    border: 1px solid var(--line-2); border-radius: 3px;
+    font-family: var(--font-mono); font-size: 11px;
+    padding: 6px 8px;
+  }
+  .path-in:focus { outline: none; border-color: var(--accent); }
+  .path-apply { min-width: 44px; padding: 6px 8px; }
+  .toast {
+    position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%);
+    background: var(--bg-2); color: var(--fg);
+    border: 1px solid var(--line-2); border-radius: 6px;
+    font-family: var(--font-mono); font-size: 12px;
+    padding: 10px 16px; max-width: 80vw;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.5);
+    opacity: 0; pointer-events: none; transition: opacity 200ms;
+    z-index: 100;
+  }
+  .toast.show { opacity: 1; }
+  .toast.ok { border-color: var(--ok); }
+  .toast.err { border-color: var(--danger); }
+  .preview-box {
+    position: fixed; right: 16px; bottom: 16px; z-index: 90;
+    display: none; max-width: 40vw; max-height: 40vh;
+    border: 1px solid var(--line-2); border-radius: 6px; overflow: hidden;
+    box-shadow: 0 8px 28px rgba(0,0,0,0.6); cursor: pointer; background: #000;
+  }
+  .preview-box img { display: block; max-width: 40vw; max-height: 40vh; }
+
+  .slider {
+    display: flex; align-items: center; gap: 8px;
+    margin-top: 4px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+  }
+  .slider .track {
+    flex: 1; height: 4px;
+    background: var(--line);
+    border-radius: 2px;
+    position: relative;
+  }
+  .slider .fill {
+    position: absolute; left: 0; top: 0; bottom: 0;
+    background: var(--accent);
+    border-radius: 2px;
+  }
+  .slider .thumb {
+    position: absolute;
+    width: 10px; height: 10px;
+    background: var(--fg);
+    border-radius: 50%;
+    top: -3px;
+    transform: translateX(-50%);
+  }
+
+  .btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 4px; }
+  .nf-slider {
+    display: grid; grid-template-columns: auto 1fr auto auto;
+    align-items: center; gap: 8px; margin-top: 8px;
+    font-family: var(--font-mono); font-size: 11px;
+  }
+  .nf-slider input[type=range] {
+    -webkit-appearance: none; appearance: none;
+    background: transparent; width: 100%; margin: 0;
+    direction: rtl; /* 좌측=max(Far), 우측=min(Near) */
+  }
+  .nf-slider input[type=range]::-webkit-slider-runnable-track {
+    height: 3px; background: var(--line-2); border-radius: 2px;
+  }
+  .nf-slider input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none;
+    width: 14px; height: 14px; border-radius: 50%;
+    background: var(--accent); border: 0; margin-top: -6px; cursor: pointer;
+  }
+  .nf-slider input[type=range]:disabled::-webkit-slider-thumb { background: var(--fg-mute); cursor: not-allowed; }
+  .nf-val { color: var(--fg); min-width: 28px; text-align: right; font-size: 12px; }
+  .btn {
+    appearance: none; -webkit-appearance: none;
+    background: var(--bg);
+    border: 1px solid var(--line-2);
+    color: var(--fg);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    padding: 8px 4px;
+    cursor: pointer;
+    border-radius: 3px;
+    transition: 100ms;
+  }
+  .btn:active { background: var(--bg-3); }
+  .btn.active { color: var(--accent); border-color: var(--accent); background: rgba(74,158,255,0.06); }
+
+  .shutter-row { margin-top: auto; padding-top: 8px; }
+  .shutter {
+    width: 100%;
+    height: 56px;
+    background: var(--danger);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    letter-spacing: 0.15em;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.15);
+  }
+  .shutter:active { background: #b91c1c; transform: translateY(1px); }
+  .rec-btn {
+    width: 100%; margin-top: 8px; padding: 10px;
+    background: var(--bg); color: var(--fg-dim);
+    border: 1px solid var(--line-2); border-radius: 4px;
+    font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.1em;
+    cursor: pointer;
+  }
+  .rec-btn:active { transform: translateY(1px); }
+  .rec-btn.recording {
+    color: #fff; background: var(--danger); border-color: var(--danger);
+    animation: recblink 1s steps(2,start) infinite;
+  }
+  @keyframes recblink { 50% { opacity: 0.5; } }
+  .cancel-btn {
+    width: 100%; margin-top: 6px; padding: 8px;
+    background: var(--bg); color: var(--fg-dim);
+    border: 1px solid var(--line-2); border-radius: 4px;
+    font-family: var(--font-ui); font-size: 12px;
+    cursor: pointer;
+  }
+  .cancel-btn:active { transform: translateY(1px); }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <div class="topbar">
+    <div class="left">
+      <span class="dot"></span>
+      <span><strong>ILCE-7C</strong></span>
+      <span>· handle <strong>0x4A1E</strong></span>
+      <span>· USB · M · MF</span>
+    </div>
+    <div class="right">
+      <span>BAT <strong id="batVal">—</strong></span>
+      <span>· <span id="shotsVal">—</span> free</span>
+    </div>
+  </div>
+
+  <div class="lv">
+    <img class="lv-img" id="lvImg" alt="">
+    <canvas class="peak-canvas" id="peakCanvas"></canvas>
+    <div class="af-marker" id="afMarker"></div>
+    <div class="lv-frame"></div>
+    <div class="lv-thirds"></div>
+    <div class="lv-corner-tl"></div>
+    <div class="lv-corner-tr"></div>
+    <div class="lv-corner-bl"></div>
+    <div class="lv-corner-br"></div>
+    <div class="lv-info">
+      LIVE VIEW · <span class="v">1920 × 1280</span> · <span class="v">JPEG</span>
+    </div>
+    <button class="lv-rotate" id="rotBtn" type="button" title="라이브뷰 회전">↻</button>
+  </div>
+
+  <div class="panel">
+
+    <div class="card">
+      <h3>Exposure</h3>
+      <div class="row"><span class="k">ISO</span><select class="sel" id="selIso" data-code="260"></select></div>
+      <div class="row"><span class="k">Shutter</span><select class="sel" id="selShutter" data-code="259"></select></div>
+      <div class="row"><span class="k">Aperture</span><select class="sel" id="selAperture" data-code="256"></select></div>
+      <div class="row"><span class="k">EV</span><select class="sel" id="selEv" data-code="257"></select></div>
+      <div class="row"><span class="k">WB</span><select class="sel" id="selWb" data-code="264"></select></div>
+      <div class="nf-slider" style="grid-template-columns:auto 1fr auto;">
+        <span class="k">색온도</span>
+        <input type="range" id="wbKelvin" min="2500" max="9900" step="100" value="5500" disabled>
+        <span class="nf-val" id="wbKelvinVal">—</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>File Format</h3>
+      <div class="row"><span class="k">Type</span><select class="sel" id="selFileType" data-code="262"></select></div>
+      <div class="row"><span class="k">Quality</span><select class="sel" id="selJpegQuality" data-code="263"></select></div>
+    </div>
+
+    <div class="card">
+      <h3>Picture Profile</h3>
+      <div class="row"><span class="k">PP</span><select class="sel" id="selPicProfile" data-code="426"></select></div>
+    </div>
+
+    <div class="card">
+      <h3>벌브 타이머</h3>
+      <div class="row">
+        <span class="k">노출(초)</span>
+        <input class="path-in" id="bulbSec" type="number" min="1" max="900" value="30" style="width:90px;flex:0 0 auto;">
+      </div>
+      <button class="btn" id="bulbBtn" type="button" style="width:100%;margin-top:6px;">노출 시작</button>
+      <div class="row" style="margin-top:6px;color:var(--fg-mute);font-size:10px;">
+        <span>셔터를 BULB로 바꿔 N초 노출 (Manual 모드 필요). 30초 초과 장노출용</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>인터벌 (타임랩스)</h3>
+      <div class="row"><span class="k">간격(초)</span><input class="path-in" id="ivSec" type="number" min="1" max="3600" value="10" style="width:90px;flex:0 0 auto;"></div>
+      <div class="row"><span class="k">장수</span><input class="path-in" id="ivCount" type="number" min="1" max="10000" value="30" style="width:90px;flex:0 0 auto;"></div>
+      <button class="btn" id="ivBtn" type="button" style="width:100%;margin-top:6px;">시작</button>
+      <div class="row" style="margin-top:6px;color:var(--fg-mute);font-size:10px;">
+        <span>소프트웨어 인터벌. RAW는 간격 ≥10초 권장(다운로드 ~8s). 초점은 MF 권장</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Drive · Metering</h3>
+      <div class="row"><span class="k">Drive</span><select class="sel" id="selDrive" data-code="270"></select></div>
+      <div class="row"><span class="k">Metering</span><select class="sel" id="selMetering" data-code="266"></select></div>
+      <div class="row"><span class="k">Shutter</span><select class="sel" id="selShutterType" data-code="425"></select></div>
+      <div class="row"><span class="k">Silent</span><select class="sel" id="selSilent" data-code="421"></select></div>
+    </div>
+
+    <div class="card">
+      <h3>Focus Mode</h3>
+      <div class="btn-row" id="focusRow">
+        <button class="btn" type="button" data-code="265" data-val="1">MF</button>
+        <button class="btn" type="button" data-code="265" data-val="2">AF-S</button>
+        <button class="btn" type="button" data-code="265" data-val="3">AF-C</button>
+        <button class="btn" type="button" data-code="265" data-val="6">DMF</button>
+      </div>
+      <div class="nf-slider">
+        <span class="k">Far</span>
+        <input type="range" id="nfSlider" min="-1" max="1" step="1" value="0" disabled>
+        <span class="k">Near</span>
+        <span class="nf-val" id="nfVal">0</span>
+      </div>
+      <div class="btn-row" style="grid-template-columns:1fr 1fr;">
+        <button class="btn" id="peakBtn" type="button">피킹 OFF</button>
+        <button class="btn" id="afCenterBtn" type="button">AF 중앙</button>
+      </div>
+      <div class="row" style="margin-top:6px;"><span class="k">AF 박스</span><select class="sel" id="afSize"><option value="4">S</option><option value="5">M</option><option value="6">L</option></select></div>
+      <button class="btn" id="halfBtn" type="button" style="width:100%;margin-top:6px;">반셔터 (누르고 유지 → AF)</button>
+      <div class="row" style="margin-top:6px;color:var(--fg-mute);font-size:10px;">
+        <span>AF 포인트: LiveView 클릭 (기본 중앙)</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Save To</h3>
+      <div class="btn-row" id="saveRow">
+        <button class="btn" type="button" data-code="281" data-val="2">SD</button>
+        <button class="btn" type="button" data-code="281" data-val="1">PC</button>
+        <button class="btn" type="button" data-code="281" data-val="3">PC+SD</button>
+      </div>
+      <div class="savepath">
+        <input class="path-in" id="savePathIn" type="text" placeholder="PC 저장 폴더 경로" spellcheck="false">
+        <button class="btn path-apply" id="savePathApply" type="button">SET</button>
+      </div>
+      <div class="savepath">
+        <input class="path-in" id="prefixIn" type="text" placeholder="파일명 접두사 (예: SHOOT)" spellcheck="false">
+      </div>
+    </div>
+
+    <div class="shutter-row">
+      <button class="shutter" type="button">CAPTURE</button>
+      <button class="rec-btn" id="recBtn" type="button">● REC</button>
+      <button class="cancel-btn" id="cancelBtn" type="button">촬영 취소</button>
+    </div>
+
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<div class="preview-box" id="previewBox"><img id="previewImg" alt="preview"></div>
+
+<script>
+  // ── DOM refs ────────────────────────────────────────────────────────
+  const sh         = document.querySelector('.shutter');
+  const dot        = document.querySelector('.topbar .dot');
+  const topLeft    = document.querySelector('.topbar .left');
+  const lvImg      = document.getElementById('lvImg');
+  let lvStreaming  = false;   // /lv 스트림 중복 시작 방지
+
+  // 셔터 라벨 깜빡임 (서버 응답 전후로 시각 피드백)
+  let flashTimer = null;
+  const flashShutter = (text, ms = 600) => {
+    sh.textContent = text;
+    clearTimeout(flashTimer);
+    flashTimer = setTimeout(() => { sh.textContent = 'CAPTURE'; }, ms);
+  };
+
+  // ── /api/status 폴링 (2초 간격) ─────────────────────────────────────
+  const startLiveView = () => {
+    if (lvStreaming) return;
+    lvStreaming = true;
+    lvImg.src = '/lv?t=' + Date.now();   // MJPEG 스트림 시작
+    lvImg.style.display = 'block';
+  };
+  const stopLiveView = () => {
+    if (!lvStreaming) return;
+    lvStreaming = false;
+    lvImg.removeAttribute('src');         // 스트림 종료 → 서버 fetch 루프도 정리됨
+    lvImg.style.display = 'none';
+  };
+  // 스트림이 끊기면(카메라 해제 등) 상태에 따라 재시작 가능하도록 플래그 해제
+  lvImg.addEventListener('error', () => { lvStreaming = false; });
+
+  const savePathIn = document.getElementById('savePathIn');
+  const savePathApply = document.getElementById('savePathApply');
+
+  const renderStatus = (st) => {
+    if (st.state === 'connected') {
+      dot.style.background = 'var(--ok)';
+      topLeft.innerHTML =
+        `<span class="dot" style="background:var(--ok)"></span>` +
+        `<span><strong>${st.model}</strong></span>` +
+        `<span>· handle <strong>${st.handle}</strong></span>` +
+        `<span>· USB</span>`;
+      // 현재 저장 경로 표시 (사용자가 입력 중이면 건드리지 않음)
+      if (st.save_path && document.activeElement !== savePathIn) {
+        savePathIn.value = st.save_path;
+      }
+      startLiveView();
+      setupNearFar();   // 카메라 연결 시 NearFar 범위 1회 받아 슬라이더 설정
+    } else {
+      topLeft.innerHTML =
+        `<span class="dot" style="background:#ef4444"></span>` +
+        `<span><strong>DISCONNECTED</strong></span>` +
+        `<span>· click CAPTURE → /api/connect 재시도</span>`;
+      stopLiveView();
+    }
+  };
+  const pollStatus = async () => {
+    try {
+      const r = await fetch('/api/status', { cache: 'no-store' });
+      renderStatus(await r.json());
+    } catch (e) { console.warn('status poll fail', e); }
+  };
+  pollStatus();
+  setInterval(pollStatus, 2000);
+
+  // ── 셔터 press-hold → /api/shutter/down · /up ───────────────────────
+  // 누르면 down, 떼면 up. 짧게=단발, 길게+연속드라이브=연사.
+  // down 완료 후 up을 보내도록 직렬화(localhost라 지연 미미).
+  let shutterPending = Promise.resolve();
+  let shutterHeld = false;
+
+  const shutterDown = () => {
+    if (shutterHeld) return;
+    shutterHeld = true;
+    flashShutter('● ●●●', 60000);
+    shutterPending = (async () => {
+      try {
+        const r = await fetch('/api/shutter/down', { method: 'POST' });
+        if (r.status === 503) {
+          shutterHeld = false;
+          flashShutter('● CONNECTING…', 5000);
+          const rc = await fetch('/api/connect', { method: 'POST' });
+          flashShutter(rc.ok ? '● CONNECTED' : `✕ ${await rc.text()}`);
+          pollStatus();
+        }
+      } catch (e) { shutterHeld = false; flashShutter(`✕ ${e.message}`, 1500); }
+    })();
+  };
+
+  const shutterUp = () => {
+    if (!shutterHeld) return;
+    shutterHeld = false;
+    shutterPending = shutterPending.then(async () => {
+      try {
+        await fetch('/api/shutter/up', { method: 'POST' });
+        flashShutter('● CAPTURED');
+      } catch (e) { flashShutter(`✕ ${e.message}`, 1500); }
+    });
+  };
+
+  sh.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    sh.setPointerCapture(e.pointerId); // 버튼 밖에서 떼도 pointerup 보장
+    shutterDown();
+  });
+  sh.addEventListener('pointerup', shutterUp);
+  sh.addEventListener('pointercancel', shutterUp);
+
+  // ── 반셔터 press-hold → /api/half/down · /up (S1 AF 합초·고정) ──────────
+  const halfBtn = document.getElementById('halfBtn');
+  let halfPending = Promise.resolve();
+  let halfHeld = false;
+  const halfDown = () => {
+    if (halfHeld) return;
+    halfHeld = true; halfBtn.classList.add('active');
+    halfPending = (async () => {
+      try {
+        const r = await fetch('/api/half/down', { method: 'POST' });
+        if (!r.ok) { halfHeld = false; halfBtn.classList.remove('active'); }
+      } catch (e) { halfHeld = false; halfBtn.classList.remove('active'); }
+    })();
+  };
+  const halfUp = () => {
+    if (!halfHeld) return;
+    halfHeld = false; halfBtn.classList.remove('active');
+    halfPending = halfPending.then(() => fetch('/api/half/up', { method: 'POST' }).catch(() => {}));
+  };
+  halfBtn.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    halfBtn.setPointerCapture(e.pointerId); // 버튼 밖에서 떼도 pointerup 보장
+    halfDown();
+  });
+  halfBtn.addEventListener('pointerup', halfUp);
+  halfBtn.addEventListener('pointercancel', halfUp);
+
+  // ── 벌브 타이머 → /api/bulb {seconds}. 서버가 N초 노출, JS는 카운트다운만 ──
+  const bulbSec = document.getElementById('bulbSec');
+  const bulbBtn = document.getElementById('bulbBtn');
+  let bulbTimer = null;
+  bulbBtn.addEventListener('click', async () => {
+    if (bulbTimer) return;                                  // 이미 진행중
+    const secs = Math.max(1, Math.min(900, parseInt(bulbSec.value, 10) || 0));
+    try {
+      const r = await fetch('/api/bulb', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ seconds: secs }),
+      });
+      if (!r.ok) { flashShutter(`✕ ${await r.text()}`, 2000); return; }
+    } catch (e) { flashShutter(`✕ ${e.message}`, 2000); return; }
+    let left = secs;
+    bulbBtn.disabled = true;
+    const tick = () => {
+      if (left <= 0) {
+        clearInterval(bulbTimer); bulbTimer = null;
+        bulbBtn.disabled = false; bulbBtn.textContent = '노출 시작';
+        flashShutter('● BULB CAPTURED');
+        return;
+      }
+      bulbBtn.textContent = `노출중… ${left}s`;
+      left--;
+    };
+    tick();
+    bulbTimer = setInterval(tick, 1000);
+  });
+
+  // ── 인터벌(타임랩스) → /api/interval. 서버가 N초마다 M장, JS는 진행표시 ──
+  const ivSec = document.getElementById('ivSec');
+  const ivCount = document.getElementById('ivCount');
+  const ivBtn = document.getElementById('ivBtn');
+  let ivTimer = null, ivShot = 0, ivTotal = 0;
+  const ivStopUI = () => {
+    if (ivTimer) clearInterval(ivTimer);
+    ivTimer = null;
+    ivSec.disabled = ivCount.disabled = false;
+    ivBtn.textContent = '시작';
+  };
+  ivBtn.addEventListener('click', async () => {
+    if (ivTimer) {                                  // 진행중 → 정지
+      await fetch('/api/interval/stop', { method: 'POST' }).catch(() => {});
+      ivStopUI();
+      return;
+    }
+    const interval = Math.max(1, Math.min(3600, parseInt(ivSec.value, 10) || 0));
+    const count = Math.max(1, Math.min(10000, parseInt(ivCount.value, 10) || 0));
+    try {
+      const r = await fetch('/api/interval', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ interval_sec: interval, count }),
+      });
+      if (!r.ok) { flashShutter(`✕ ${await r.text()}`, 2000); return; }
+    } catch (e) { flashShutter(`✕ ${e.message}`, 2000); return; }
+    ivShot = 0; ivTotal = count;
+    ivSec.disabled = ivCount.disabled = true;
+    const tick = () => {                             // 서버 타이밍 추정 진행표시
+      ivShot++;
+      flashShutter(`● 인터벌 ${ivShot}/${ivTotal}`);
+      ivBtn.textContent = `정지 (${ivShot}/${ivTotal})`;
+      if (ivShot >= ivTotal) ivStopUI();
+    };
+    tick();                                          // 첫 샷 즉시
+    ivTimer = setInterval(tick, interval * 1000);
+  });
+
+  // ── 속성 컨트롤 ───────────────────────────────────────────────────────
+  const selIso      = document.getElementById('selIso');
+  const selShutter  = document.getElementById('selShutter');
+  const selAperture = document.getElementById('selAperture');
+  const selEv       = document.getElementById('selEv');
+  const selWb       = document.getElementById('selWb');
+  const selDrive    = document.getElementById('selDrive');
+  const selMetering = document.getElementById('selMetering');
+  const selShutterType = document.getElementById('selShutterType');
+  const selSilent   = document.getElementById('selSilent');
+  const selFileType = document.getElementById('selFileType');
+  const selJpegQuality   = document.getElementById('selJpegQuality');
+  const selPicProfile    = document.getElementById('selPicProfile');
+  const wbKelvin         = document.getElementById('wbKelvin');
+  const wbKelvinVal      = document.getElementById('wbKelvinVal');
+
+  const STYPE = {1:'자동', 2:'기계', 3:'전자'};
+  const SILENT = {1:'Off', 2:'On'};
+  const JPEGQ = {1:'Light', 2:'표준', 3:'Fine', 4:'X.Fine'};
+  const PPROFILE = {0:'Off', 1:'PP1', 2:'PP2', 3:'PP3', 4:'PP4', 5:'PP5', 6:'PP6',
+    7:'PP7', 8:'PP8', 9:'PP9', 10:'PP10', 11:'PP11',
+    0x41:'LUT1', 0x42:'LUT2', 0x43:'LUT3', 0x44:'LUT4'};
+
+  const WB = {0x0000:'AWB',0x0001:'수중오토',0x0011:'주광',0x0012:'그늘',0x0013:'흐림',
+    0x0014:'백열등',0x0020:'형광',0x0021:'형광-온백색',0x0022:'형광-냉백색',
+    0x0023:'형광-주백색',0x0024:'형광-주광',0x0030:'플래시',0x0100:'색온도/필터',
+    0x0101:'커스텀1',0x0102:'커스텀2',0x0103:'커스텀3',0x0104:'커스텀'};
+  const DRIVE = {1:'단발',0x10001:'연속Hi',0x10002:'연속Hi+',0x10003:'연속Hi-L',
+    0x10004:'연속Lo',0x10005:'연속',0x10006:'연속(속도)',0x10007:'연속Mid',
+    0x10008:'연속Mid-L',0x10009:'연속Lo-L',
+    0x11001:'버스트Lo',0x11002:'버스트Mid',0x11003:'버스트Hi',
+    0x12001:'포커스브라켓',0x20001:'타임랩스',
+    0x30001:'타이머2s',0x30002:'타이머5s',0x30003:'타이머10s',
+    0x60001:'WB브라켓Lo',0x60002:'WB브라켓Hi',0x70001:'DRO브라켓Lo',0x70002:'DRO브라켓Hi'};
+  const METER = {1:'평균',2:'중앙중점평균',3:'멀티스팟',4:'중앙스팟',5:'멀티',6:'중앙중점',
+    7:'전체화면평균',8:'스팟(표준)',9:'스팟(대)',0xA:'하이라이트중점',0xB:'표준',0xC:'역광',0xD:'스포트라이트'};
+
+  // raw 값 → 라벨. 매핑/유효성 실패 시 null 반환 → fillSelect가 옵션에서 제외
+  // (SDK가 allowed 배열에 끼워넣는 쓰레기값 방어).
+  const dec = {
+    iso: v => {
+      v = v >>> 0;
+      if (v === 0xFFFFFF) return 'AUTO';
+      if (v >= 0x20000000) return null;
+      const n = v & 0xFFFFFF;
+      return (n >= 25 && n <= 819200) ? String(n) : null;
+    },
+    shutter: v => {
+      if (v === 0) return 'BULB';            // CrShutterSpeed_Bulb = 0 (장노출, 누르고 유지)
+      const num = v >>> 16, den = v & 0xFFFF;
+      if (!den || num === 0 || num > 0x2000) return null;
+      if (num === 1) return `1/${den}`;
+      if (num % den === 0) return `${num / den}"`;
+      return `${(num / den).toFixed(1)}"`;
+    },
+    aperture: v => (v >= 100 && v <= 9999) ? 'f/' + (v / 100).toFixed(1) : null,
+    ev: v => {
+      const s = v > 0x7FFFFFFF ? v - 0x100000000 : v;
+      if (Math.abs(s) > 6000) return null;
+      const e = s / 1000;
+      return (e > 0 ? '+' : '') + e.toFixed(1);
+    },
+    wb: v => WB[v] ?? null,
+    drive: v => {
+      if (DRIVE[v]) return DRIVE[v];
+      const hi = (v >>> 16) & 0xFFFF;
+      if (hi === 0x4) return '연속브라켓';
+      if (hi === 0x5) return '싱글브라켓';
+      if (hi === 0x8) return '연속타이머';
+      if (v >= 0x10000001 && v <= 0x10000005)
+        return {1:'LPF브라켓',2:'리모컨',3:'미러업',4:'셀프1',5:'셀프2'}[v & 0xF];
+      return null;
+    },
+    metering: v => METER[v] ?? null,
+    stype: v => STYPE[v] ?? null,
+    silent: v => SILENT[v] ?? null,
+    filetype: v => ({0:'—',1:'JPEG',2:'RAW',3:'RAW+JPEG',4:'RAW+HEIF',5:'HEIF'}[v] ?? null),
+    jpegq: v => JPEGQ[v] ?? null,
+    pprofile: v => PPROFILE[v] ?? null,
+  };
+
+  // allowed[]에서 디코딩 가능한 값만 <option>으로. 0 패딩·중복·SDK 쓰레기 제외.
+  // 현재값은 항상 포함(라벨 폴백). 사용자가 조작 중이면 갱신 건너뜀.
+  const fillSelect = (sel, prop, decode, allowZero = false) => {
+    if (document.activeElement === sel) return;
+    if (!prop) { sel.innerHTML = '<option>—</option>'; sel.disabled = true; return; }
+    const cur = prop.value;
+    const seen = new Set();
+    const seenLabels = new Set();   // 같은 라벨 변종(브라켓 등) 중복 제거
+    const opts = [];
+    for (const v of (prop.allowed || [])) {
+      if ((v === 0 && !allowZero) || seen.has(v)) continue;
+      const label = decode(v);
+      if (label == null || seenLabels.has(label)) continue;
+      seen.add(v); seenLabels.add(label); opts.push([v, label]);
+    }
+    if (!seen.has(cur)) opts.unshift([cur, decode(cur) ?? String(cur)]);
+    const sig = opts.map(o => o[0]).join(',');
+    if (sel.dataset.sig !== sig) {
+      sel.innerHTML = opts.map(([v, l]) => `<option value="${v}">${l}</option>`).join('');
+      sel.dataset.sig = sig;
+    }
+    sel.value = String(cur);
+    sel.disabled = opts.length <= 1;
+  };
+
+  const highlightRow = (rowId, current) => {
+    document.querySelectorAll(`#${rowId} .btn`).forEach(b => {
+      b.classList.toggle('active', Number(b.dataset.val) === current);
+    });
+  };
+
+  const pollProperties = async () => {
+    try {
+      const r = await fetch('/api/properties', { cache: 'no-store' });
+      if (!r.ok) return;                       // 미연결 시 503 → 무시
+      const p = await r.json();
+      fillSelect(selIso, p.iso, dec.iso);
+      fillSelect(selShutter, p.shutter_speed, dec.shutter, true); // BULB(0)은 실제 값
+      fillSelect(selAperture, p.f_number, dec.aperture);
+      fillSelect(selEv, p.ev, dec.ev);
+      fillSelect(selWb, p.white_balance, dec.wb);
+      fillSelect(selDrive, p.drive_mode, dec.drive);
+      fillSelect(selMetering, p.metering, dec.metering);
+      fillSelect(selShutterType, p.shutter_type, dec.stype);
+      fillSelect(selSilent, p.silent_mode, dec.silent);
+      fillSelect(selFileType, p.file_type, dec.filetype);
+      fillSelect(selJpegQuality, p.jpeg_quality, dec.jpegq);
+      fillSelect(selPicProfile, p.picture_profile, dec.pprofile, true); // Off(0)은 실제 값
+      if (p.color_temp) {
+        const ct = p.color_temp;
+        if (document.activeElement !== wbKelvin) {   // 드래그 중이면 갱신 건너뜀
+          wbKelvin.value = String(ct.value);
+          wbKelvinVal.textContent = ct.value + 'K';
+        }
+        wbKelvin.disabled = !ct.editable;            // WB=색온도 모드일 때만 활성
+      } else {
+        wbKelvin.disabled = true; wbKelvinVal.textContent = '—';
+      }
+      if (p.focus_mode)   highlightRow('focusRow', p.focus_mode.value);
+      if (p.save_dest)    highlightRow('saveRow', p.save_dest.value);
+      if (p.recording_state) renderRecording(p.recording_state.value === 1);
+      if (p.battery) {
+        const b = p.battery.value;
+        document.getElementById('batVal').textContent = (b === 0xFFFF || b == null) ? '—' : b + '%';
+      }
+      if (p.remain_shots) {
+        const n = p.remain_shots.value;
+        document.getElementById('shotsVal').textContent = (n == null) ? '—' : n.toLocaleString();
+      }
+      // AF 박스 마커 크기 = 카메라 실제 FocusArea(S/M/L) 반영 (px는 근사 시각표시)
+      if (p.focus_area) {
+        const fa = p.focus_area.value;
+        const sz = { 4: 40, 5: 58, 6: 82 }[fa] || 56;
+        afMarker.style.width = sz + 'px';
+        afMarker.style.height = sz + 'px';
+        if ([4, 5, 6].includes(fa) && document.activeElement !== afSize) afSize.value = String(fa);
+      }
+    } catch (e) { console.warn('properties poll fail', e); }
+  };
+
+  const setProp = async (code, value) => {
+    try {
+      const r = await fetch('/api/property', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: Number(code), value: Number(value) }),
+      });
+      if (!r.ok) console.warn('setProp fail', await r.text());
+    } catch (e) { console.warn('setProp error', e); }
+    pollProperties();                          // 즉시 반영
+  };
+
+  // 버튼형 (Focus / Save) + dropdown형 (ISO/Shutter/Aperture/FileType)
+  document.querySelectorAll('.btn-row .btn[data-code]').forEach(b =>
+    b.addEventListener('click', () => setProp(b.dataset.code, b.dataset.val))
+  );
+  // MF 초점 슬라이더 — 카메라가 min/step/max 알려줌(GetSelectControlCode).
+  // 슬라이드 → 놓을 때 그 step을 NearFar로 실행 → 중앙(0)으로 리셋 (joystick 패턴).
+  const nfSlider = document.getElementById('nfSlider');
+  const nfVal    = document.getElementById('nfVal');
+  let nfReady = false;
+
+  const setupNearFar = async () => {
+    if (nfReady) return;
+    try {
+      const r = await fetch('/api/focus_nearfar/info', { cache: 'no-store' });
+      if (!r.ok) return;
+      const info = await r.json();
+      // Range(0x4000): values[0..3] = [min, max, step] (실측 — 후행 0 padding 있을 수 있음).
+      // Array(0x2000): enum, min/max로 환산.
+      let min = -1, max = 1, step = 1;
+      if (info.is_range && info.values.length >= 3) {
+        [min, max, step] = info.values;
+      } else if (info.is_array && info.values.length > 0) {
+        min = Math.min(...info.values);
+        max = Math.max(...info.values);
+        step = 1; // enum이라도 정수 step. 정확히 매핑하려면 snap 로직 추가 가능.
+      }
+      nfSlider.min = String(min);
+      nfSlider.max = String(max);
+      nfSlider.step = String(Math.max(1, Math.abs(step)));
+      nfSlider.value = '0';
+      nfSlider.disabled = false;
+      nfVal.textContent = '0';
+      nfReady = true;
+    } catch (e) { console.warn('nearfar info', e); }
+  };
+
+  nfSlider.addEventListener('input', () => { nfVal.textContent = nfSlider.value; });
+  nfSlider.addEventListener('change', async () => {
+    const step = parseInt(nfSlider.value, 10);
+    if (step === 0) return;
+    try {
+      await fetch('/api/focus_nearfar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ step }),
+      });
+    } catch (e) { console.warn('nearfar', e); }
+    nfSlider.value = '0';
+    nfVal.textContent = '0';
+  });
+  // WB 색온도 슬라이더 — 카메라가 켈빈 생값(5500 등)을 그대로 보고/수용. 범위 하드코딩(2500~9900/100K).
+  wbKelvin.addEventListener('input', () => { wbKelvinVal.textContent = wbKelvin.value + 'K'; });
+  wbKelvin.addEventListener('change', () => setProp(277, wbKelvin.value)); // 277 = 0x0115 Colortemp
+
+  [selIso, selShutter, selAperture, selEv, selWb, selDrive, selMetering, selShutterType, selSilent, selFileType, selJpegQuality, selPicProfile].forEach(sel =>
+    sel.addEventListener('change', () => setProp(sel.dataset.code, sel.value))
+  );
+
+  // ── 동영상 녹화 (MovieRecord) ─────────────────────────────────────────
+  const recBtn = document.getElementById('recBtn');
+  let recording = false;
+  const renderRecording = (on) => {
+    recording = on;
+    recBtn.classList.toggle('recording', on);
+    recBtn.textContent = on ? '■ STOP' : '● REC';
+  };
+  recBtn.addEventListener('click', async () => {
+    const url = recording ? '/api/movie/stop' : '/api/movie/start';
+    try {
+      const r = await fetch(url, { method: 'POST' });
+      if (!r.ok) { console.warn('movie', await r.text()); return; }
+      renderRecording(!recording);   // 낙관적 갱신 — 폴링이 곧 실제 상태로 보정
+      pollProperties();
+    } catch (e) { console.warn('movie', e); }
+  });
+
+  // ── 촬영 취소 (CancelShooting) ────────────────────────────────────────
+  const cancelBtn = document.getElementById('cancelBtn');
+  cancelBtn.addEventListener('click', async () => {
+    try {
+      const r = await fetch('/api/cancel', { method: 'POST' });
+      if (!r.ok) console.warn('cancel', await r.text());
+    } catch (e) { console.warn('cancel', e); }
+  });
+
+  // ── 저장 폴더 변경 → POST /api/savepath ───────────────────────────────
+  const applySavePath = async () => {
+    const path = savePathIn.value.trim();
+    if (!path) return;
+    savePathApply.disabled = true;
+    savePathApply.textContent = '…';
+    try {
+      const r = await fetch('/api/savepath', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path, prefix: document.getElementById('prefixIn').value.trim() }),
+      });
+      const body = await r.text();
+      savePathApply.textContent = r.ok ? 'OK' : '✕';
+      if (r.ok) savePathIn.value = body;          // 서버가 적용한 경로
+      else console.warn('savepath fail', body);
+    } catch (e) {
+      savePathApply.textContent = '✕';
+      console.warn('savepath error', e);
+    } finally {
+      setTimeout(() => { savePathApply.textContent = 'SET'; savePathApply.disabled = false; }, 1200);
+    }
+  };
+  savePathApply.addEventListener('click', applySavePath);
+  savePathIn.addEventListener('keydown', e => { if (e.key === 'Enter') applySavePath(); });
+
+  pollProperties();
+  setInterval(pollProperties, 2000);
+
+  // ── SSE 이벤트 스트림 (/events) ───────────────────────────────────────
+  const toastEl = document.getElementById('toast');
+  let toastTimer = null;
+  const toast = (msg, cls = '') => {
+    toastEl.textContent = msg;
+    toastEl.className = 'toast show ' + cls;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { toastEl.className = 'toast'; }, 3000);
+  };
+
+  const sse = new EventSource('/events');   // 끊기면 브라우저가 자동 재연결
+  sse.onmessage = (e) => {
+    let ev;
+    try { ev = JSON.parse(e.data); } catch { return; }
+    switch (ev.type) {
+      case 'download_complete': {
+        const name = (ev.filename || '').split('/').pop();
+        toast(`저장됨: ${name}`, 'ok');
+        showPreview();   // 방금 저장된 이미지 미리보기
+        break;
+      }
+      case 'property_changed':
+        pollProperties();        // 다이얼 변경 즉시 반영 (2초 폴링 대기 없이)
+        break;
+      case 'disconnected':
+        toast('카메라 연결 끊김', 'err');
+        pollStatus();
+        break;
+      case 'error':
+        toast(`SDK 오류 0x${(ev.code >>> 0).toString(16)}`, 'err');
+        break;
+      // warning / lv_property_changed 등은 조용히 무시
+    }
+  };
+
+  // ── ① 촬영 직후 미리보기 ──────────────────────────────────────────────
+  // download_complete 시 서버가 마지막 PC 저장 파일을 /api/last_image로 반환.
+  // RAW(ARW)는 브라우저가 못 그리므로 JPEG/HEIF만 표시, 그 외는 토스트만.
+  const showPreview = () => {
+    const img = document.getElementById('previewImg');
+    const box = document.getElementById('previewBox');
+    img.onerror = () => { box.style.display = 'none'; };
+    img.onload  = () => { box.style.display = 'block'; };
+    img.src = '/api/last_image?t=' + Date.now();
+  };
+  document.getElementById('previewBox').addEventListener('click', () => {
+    document.getElementById('previewBox').style.display = 'none';
+  });
+
+  // ── ② 포커스 피킹 (클라이언트 엣지검출) ───────────────────────────────
+  // LiveView 프레임을 작은 작업 캔버스로 다운샘플 → 명암차(Sobel 유사) →
+  // 고대비 픽셀을 오버레이 캔버스에 노란 점으로. rAF 루프, 피킹 ON일 때만.
+  const peakBtn = document.getElementById('peakBtn');
+  const peakCanvas = document.getElementById('peakCanvas');
+  const pctx = peakCanvas.getContext('2d');
+  const work = document.createElement('canvas');
+  const wctx = work.getContext('2d', { willReadFrequently: true });
+  const PW = 480, PH = 320;
+  work.width = PW; work.height = PH;
+  let peaking = false;
+  const peakLoop = () => {
+    if (!peaking) return;
+    if (lvImg.naturalWidth > 0) {
+      try {
+        wctx.drawImage(lvImg, 0, 0, PW, PH);
+        const src = wctx.getImageData(0, 0, PW, PH).data;
+        peakCanvas.width = PW; peakCanvas.height = PH;
+        const out = pctx.createImageData(PW, PH);
+        const d = out.data;
+        const TH = 48;
+        for (let y = 1; y < PH - 1; y++) {
+          for (let x = 1; x < PW - 1; x++) {
+            const i = (y * PW + x) * 4;
+            const l  = src[i]*0.299 + src[i+1]*0.587 + src[i+2]*0.114;
+            const lr = src[i+4]*0.299 + src[i+5]*0.587 + src[i+6]*0.114;
+            const ld = src[i+PW*4]*0.299 + src[i+PW*4+1]*0.587 + src[i+PW*4+2]*0.114;
+            if (Math.abs(l - lr) + Math.abs(l - ld) > TH) {
+              d[i] = 255; d[i+1] = 220; d[i+2] = 0; d[i+3] = 255;
+            }
+          }
+        }
+        pctx.putImageData(out, 0, 0);
+      } catch (e) { /* LV 전환 중 프레임 미준비 */ }
+    }
+    requestAnimationFrame(peakLoop);
+  };
+  peakBtn.addEventListener('click', () => {
+    peaking = !peaking;
+    peakBtn.classList.toggle('active', peaking);
+    peakBtn.textContent = peaking ? '피킹 ON' : '피킹 OFF';
+    peakCanvas.classList.toggle('on', peaking);
+    if (peaking) requestAnimationFrame(peakLoop);
+    else pctx.clearRect(0, 0, peakCanvas.width, peakCanvas.height);
+  });
+
+  // ── ③ AF 포인트 지정 (기본 중앙) ──────────────────────────────────────
+  // LiveView 클릭 → 정규화 좌표(0~1) → POST /api/af_point. 마커 이동.
+  const afMarker = document.getElementById('afMarker');
+  const lvWrap = document.querySelector('.lv');
+  const afSize = document.getElementById('afSize');
+  const sendAfPoint = async (nx, ny) => {
+    afMarker.style.left = (nx * 100) + '%';
+    afMarker.style.top  = (ny * 100) + '%';
+    try {
+      await fetch('/api/af_point', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ x: nx, y: ny, area: Number(afSize.value) }),
+      });
+    } catch (e) { console.warn('af_point', e); }
+  };
+  lvWrap.addEventListener('click', (e) => {
+    const r = lvWrap.getBoundingClientRect();
+    const nx = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
+    const ny = Math.min(1, Math.max(0, (e.clientY - r.top) / r.height));
+    sendAfPoint(nx, ny);
+  });
+  document.getElementById('afCenterBtn').addEventListener('click', () => sendAfPoint(0.5, 0.5));
+  // AF 박스 크기 변경 → 즉시 카메라 FocusArea 설정 (275=0x0113). poll이 마커 크기 반영.
+  afSize.addEventListener('change', () => setProp(275, Number(afSize.value)));
+
+  // 라이브뷰 회전 토글 — lv-img만 시각 회전(scale로 fit). 세로 촬영 시 화면 정위치.
+  // 주: A7C는 자이로 미노출이라 자동회전 불가 → 수동. AF 클릭 좌표 리맵은 추후(증상1).
+  const rotBtn = document.getElementById('rotBtn');
+  let lvRot = 0;
+  const applyRot = () => {
+    const r = lvWrap.getBoundingClientRect();
+    const s = (lvRot % 180 !== 0) ? Math.min(r.width, r.height) / Math.max(r.width, r.height) : 1;
+    lvImg.style.transform = `rotate(${lvRot}deg) scale(${s})`;
+  };
+  rotBtn.addEventListener('click', () => {
+    lvRot = (lvRot + 90) % 360;
+    rotBtn.textContent = lvRot ? '↻' + lvRot : '↻';
+    applyRot();
+  });
+  window.addEventListener('resize', applyRot);
+</script>
+</body>
+</html>

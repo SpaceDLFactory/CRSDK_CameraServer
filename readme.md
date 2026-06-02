@@ -1,123 +1,77 @@
 # sonyCRSDK rust bind
 
-Sony Camera Remote SDK(macOS)를 Rust 언어로 제어하기 위한 FFI(Foreign Function Interface) 래퍼 프로젝트입니다.  
-C++ 기반의 SDK 인터페이스를 Rust의 안전한 에코시스템 내에서 활용할 수 있도록 설계되었으며, SDL Factory 프로젝트의 핵심 엔진으로 활용됩니다.
+Sony Camera Remote SDK(macOS)를 **Rust로 안전하게 래핑**하고, 그 위에 **브라우저 테더링 서버**를 올린 프로젝트입니다.
+C++ 기반 SDK를 `extern "C"` C-shim + `bindgen`으로 Rust에 연결하고, `axum` HTTP/SSE 서버가 카메라를 노출해
+**웹/폰 브라우저에서 노출·포커스·촬영·라이브뷰**를 원격 제어합니다.
+
+> ## ⚠️ 대상 기기: Sony A7C (ILCE-7C) 전용
+> 이 툴은 **ILCE-7C 한 대로만 개발·검증**되었습니다. 다른 바디는 테스트되지 않았으며,
+> A7C가 노출하지 않는 기능(자이로/CreativeLook/벌브타이머/AF영역 device property 등)은
+> 코드에 남아 있어도 이 바디에선 동작하지 않습니다. 멀티바디 지원은 향후 과제입니다.
 
 ---
 
-## 🚀 Key Features
+## 🚀 기능
 
-- **Safe FFI Binding**  
-  `bindgen`을 사용하여 Sony SDK의 타입과 상수를 Rust 코드로 자동 생성합니다.
-- **C-Shim Bridge**  
-  Rust에서 직접 호출하기 까다로운 C++ 인터페이스(`Namespace: SCRSDK`)를 `extern "C"` 함수로 래핑하여 안정성을 확보했습니다.
-- **macOS Optimized**  
-  Apple Silicon(M1/M2/M3) 환경의 `.dylib` 동적 라이브러리 링크 및 `rpath` 설정을 지원합니다.
-- **Rust 2024 Edition**  
-  최신 Rust 표준을 사용하여 견고한 빌드 시스템을 구축했습니다.
+- **Safe FFI**: `bindgen`으로 SDK 타입/함수 자동 바인딩 + `wrapper/`의 pure-C shim(`SCRSDK` 네임스페이스 우회)
+- **테더링 서버**(`crsdk_server`, axum/tokio): 자동 연결·재연결, 모든 SDK 호출 `spawn_blocking` 격리
+- **웹 UI**(단일 페이지): MJPEG 라이브뷰 + 포커스 피킹, 노출/색(ISO·셔터·조리개·EV·WB·켈빈 슬라이더·측광·드라이브·파일포맷·JPEG품질·Picture Profile)
+- **촬영**: 단발·연사·동영상·취소, **장노출**(고정 1"~30" / BULB / 소프트웨어 벌브 타이머), **소프트웨어 인터벌(타임랩스)**
+- **포커스**: MF NearFar 슬라이더, AF 포인트(라이브뷰 클릭, 좌표 보정) + 박스 크기 S/M/L, 반셔터(S1)
+- **저장/상태**: PC 저장(경로·접두사), 촬영 미리보기, 배터리·남은 컷, 라이브뷰 회전 토글
+- **안전 종료**: SIGTERM/SIGINT graceful shutdown으로 카메라 세션 클린 해제(재연결 FailBusy 방지)
 
----
-
-## 🛠 Prerequisites
-
-본 프로젝트를 빌드하고 실행하기 위해 다음 구성 요소가 필요합니다.
-
-1. **Sony Camera Remote SDK**  
-   Sony Developer World에서 다운로드한 macOS용 SDK (**v2.01.00 이상**)
-2. **LLVM/Clang**  
-   `bindgen`이 C++ 헤더를 분석하기 위해 필요합니다.
-   ```bash
-   brew install llvm
-   ```
-3. **Rust Toolchain**  
-   Rust 2024 Edition을 지원하는 최신 Rust 버전
+자세한 기능 현황은 [`STATUS.md`](STATUS.md), 구조는 [`ARCHITECTURE.md`](ARCHITECTURE.md) 참조.
 
 ---
 
-## 📂 Project Structure
+## 🛠 빌드 전제
+
+1. **Sony Camera Remote SDK** (macOS, v2.01.00) — Sony Developer World에서 받아 프로젝트 루트에 `CrSDK_v2.01.00_20260203a_Mac/`로 배치. **저작권 Sony, 본 저장소에 미포함**(.gitignore).
+2. **LLVM/Clang** (`bindgen`용): `brew install llvm`
+3. **Rust** (edition 2021)
+
+## 📂 구조
 
 ```text
 crsdk_rust_wrapper/
-├── Cargo.toml            # 프로젝트 의존성 (thiserror 2.0.18, bindgen 0.72.1)
-├── build.rs              # C++ 컴파일 및 바인딩 자동 생성 스크립트
-├── wrapper.cpp           # C++ to C 징검다리 코드 (C-Shim)
-├── wrapper.hpp           # SDK 헤더 진입점 및 Namespace 정의
-├── src/
-│   └── main.rs           # SDK 초기화 및 테스트 로직
-└── CrSDK_v2.01.00_.../   # Sony SDK 원본 폴더 (사용자 직접 배치)
+├── Cargo.toml            # workspace (crsdk lib + crsdk_server)
+├── build.rs              # cc로 wrapper 컴파일 + bindgen 바인딩 생성
+├── wrapper/              # wrapper.{h,cpp} — pure-C shim
+├── src/                  # safe Rust: session/enumerate/connection/liveview/shutter/control/properties/callback/error
+├── crsdk_server/         # axum 서버 + web/index.html (브라우저 UI)
+└── CrSDK_v2.01.00_.../   # Sony SDK (사용자 직접 배치, 미포함)
 ```
 
----
+## ⚙️ 빌드 & 실행
 
-## ⚙️ Setup & Build
+```bash
+# SDK dylib 런타임 경로
+export DYLD_LIBRARY_PATH=$DYLD_LIBRARY_PATH:$(pwd)/CrSDK_v2.01.00_20260203a_Mac/RemoteCli/external/crsdk/
 
-1. **SDK 배치**  
-   다운로드한 SDK를 프로젝트 루트에 배치합니다.
-2. **경로 확인**  
-   `build.rs` 내의 `sdk_base` 변수값이 실제 폴더명(예: `CrSDK_v2.01.00_20260203a_Mac`)과 일치하는지 확인합니다.
-3. **빌드**
-   ```bash
-   cargo build
-   ```
-4. **런타임 라이브러리 경로 설정**  
-   macOS 환경에서 동적 라이브러리 로드를 위해 실행 시 경로 지정이 필요합니다.
-   ```bash
-   export DYLD_LIBRARY_PATH=$DYLD_LIBRARY_PATH:$(pwd)/CrSDK_v2.01.00_20260203a_Mac/RemoteCli/external/crsdk/
-   cargo run
-   ```
+# 테더링 서버 (브라우저 UI)
+cargo run -p crsdk_server      # http://localhost:8080/web/index.html
 
----
-
-## 💻 Usage Example (`src/main.rs`)
-
-```rust
-#![allow(non_upper_case_globals)]
-#![allow(non_camel_case_types)]
-#![allow(non_snake_case)]
-
-// build.rs에서 생성된 바인딩 파일 포함
-include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
-
-fn main() {
-    println!("--- SDL Factory: Sony SDK 연동 테스트 ---");
-
-    unsafe {
-        // 1. SDK 버전 확인
-        let version = get_sdk_version();
-        println!("SDK Version: {}", version);
-
-        // 2. SDK 초기화
-        if sdk_init(0) {
-            println!("✅ Sony SDK 초기화 성공!");
-
-            // TODO: 카메라 탐색(EnumCameraObjects) 로직 구현 예정
-
-            // 3. SDK 리소스 해제
-            if sdk_release() {
-                println!("✅ Released!");
-            }
-        } else {
-            println!("❌ SDK 초기화 실패");
-        }
-    }
-}
+# FFI 동작 확인용 예제
+cargo run --bin crsdk_example
 ```
 
+macOS의 `ptpcamerad`가 USB 카메라 접근을 방해하므로 서버가 부팅 시 억제합니다(정상 동작).
+
 ---
 
-## 🗺 Roadmap
+## 🌙 첫 작품
 
-- [x] SDK Environment Setup & Linker Configuration (macOS)
-- [x] C-Shim Bridge for C++ Namespace Handling (`SCRSDK`)
-- [x] Basic SDK Initialization & Version Check
-- [ ] Camera Device Enumeration (`EnumCameraObjects`)
-- [ ] Remote Shutter & PTZF (Pan/Tilt/Zoom/Focus) Automation
-- [ ] SDL Factory: Deep Learning based Astronomical Tracking System
+이 툴로 찍은 첫 사진. ILCE-7C + FE 100-400 GM, 무보정.
+
+![first moon](gallery/first-moon.jpg)
+
+> © neko.kim.film (김괭필름)
 
 ---
 
 ## ⚖️ License
 
-This project is licensed under the **MIT License**.
+MIT License.
 
-> Note: Sony SDK 관련 헤더 및 라이브러리 파일의 저작권은 Sony에 있습니다.
+> Sony SDK 관련 헤더·라이브러리·문서의 저작권은 Sony에 있으며 본 저장소에 포함되지 않습니다.
