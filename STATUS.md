@@ -97,7 +97,9 @@
 ### Tier 3 — 뷰·편의
 - ✅ **그리드 토글** — 라이브뷰 우상단 ▦ 버튼, 3분할 그리드 on/off(기본 ON, `.lv-thirds` display)
 - ✅ **히스토그램** — 우측 패널 카드(라이브뷰 위 오버레이 X, 어두운 장면 시인성). 라이브뷰 프레임 240×160 다운샘플 → RGB 256-bin, 가산합성(lighter) 렌더, setInterval ~8fps, 피킹과 별도 캔버스. 미검증: 하드웨어(라이브뷰 피드 필요)
-- ❌ 100% 확대 초점확인, 촬영 히스토리/필름스트립, LiveView 다중 클라이언트
+- ✅ **100% 확대 초점확인** — 라이브뷰 우상단 🔍 토글, 루페 캔버스가 lvImg 원본 픽셀을 1:1 크롭 표시(MF 정밀초점). 줌 모드 클릭=확대 지점 선택(AF 아님), 회전은 applyRot 동일 변환. CSS transform과 분리(별도 캔버스). 미검증: 하드웨어
+- ✅ **필름스트립** — 우측 Recent 카드, download_complete마다 `/api/last_image` 즉시 로드→캔버스 다운스케일 dataURL 누적(서버는 최신 1장만 기억하나 로드된 픽셀 보존, 최대 12장). RAW는 onerror 스킵, 썸네일 클릭=미리보기 확대. 서버 무변경. 미검증: 하드웨어
+- ⏸ LiveView 다중 클라이언트 — 보류(현재 단일 MJPEG fetch 루프 가정 → 프레임 fan-out/broadcast 서버 동시성 개조 필요, 결이 다른 아키텍처 작업)
 
 ### 마지막 순위 — WiFi/SSH 연결
 - ❌ **WiFi/SSH 연결** — lib에 연결 인증 경로(`ConnectMode::Wifi`+`get_fingerprint`)는 있으나, ① 카메라 발견이 `EnumCameraObjects` 자동탐색뿐(IP 등록 `CreateCameraObjectInfoEthernetConnection` FFI 미구현) ② A7C의 SDK WiFi 테더링 지원 여부 미검증. 착수 전 자동발견 실측 진단(경로 A/B 분기) 필요

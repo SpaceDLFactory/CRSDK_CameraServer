@@ -96,7 +96,7 @@
     box-shadow: 0 0 0 1px rgba(0,0,0,0.5);
     left: 50%; top: 50%;
   }
-  .lv-rotate, .lv-grid {
+  .lv-rotate, .lv-grid, .lv-zoom {
     position: absolute; top: 8px; z-index: 6;
     width: 34px; height: 34px; border-radius: 6px;
     background: rgba(0,0,0,0.45); color: var(--fg);
@@ -105,8 +105,21 @@
   }
   .lv-rotate { right: 8px; }
   .lv-grid   { right: 50px; font-size: 15px; }
-  .lv-rotate:hover, .lv-grid:hover { background: rgba(0,0,0,0.7); }
+  .lv-zoom   { right: 92px; font-size: 15px; }
+  .lv-rotate:hover, .lv-grid:hover, .lv-zoom:hover { background: rgba(0,0,0,0.7); }
   .lv-grid.off { opacity: 0.45; }
+  .lv-zoom.on { background: var(--accent); color: #000; border-color: var(--accent); }
+  .loupe-canvas {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    z-index: 5; display: none; background: #000;
+  }
+  .loupe-canvas.on { display: block; }
+  .filmstrip { display: flex; gap: 4px; overflow-x: auto; padding-bottom: 2px; }
+  .film-thumb {
+    height: 46px; flex: 0 0 auto; border-radius: 2px; cursor: pointer;
+    border: 1px solid var(--line);
+  }
+  .film-thumb:hover { border-color: var(--accent); }
   .lv-frame {
     position: absolute; inset: 12px;
     border: 1px solid var(--line);
@@ -337,6 +350,7 @@
   <div class="lv">
     <img class="lv-img" id="lvImg" alt="">
     <canvas class="peak-canvas" id="peakCanvas"></canvas>
+    <canvas class="loupe-canvas" id="loupeCanvas"></canvas>
     <div class="af-marker" id="afMarker"></div>
     <div class="lv-frame"></div>
     <div class="lv-thirds"></div>
@@ -347,6 +361,7 @@
     <div class="lv-info">
       LIVE VIEW · <span class="v">1920 × 1280</span> · <span class="v">JPEG</span>
     </div>
+    <button class="lv-zoom" id="zoomBtn" type="button" title="100% 확대 초점확인 (클릭=지점 선택)">🔍</button>
     <button class="lv-grid" id="gridBtn" type="button" title="3분할 그리드 토글">▦</button>
     <button class="lv-rotate" id="rotBtn" type="button" title="라이브뷰 회전">↻</button>
   </div>
@@ -453,6 +468,11 @@
       <div class="savepath">
         <input class="path-in" id="prefixIn" type="text" placeholder="파일명 접두사 (예: SHOOT)" spellcheck="false">
       </div>
+    </div>
+
+    <div class="card" id="recentCard" style="display:none;">
+      <h3>Recent</h3>
+      <div class="filmstrip" id="filmstrip"></div>
     </div>
 
     <div class="shutter-row">
@@ -1020,7 +1040,8 @@
       case 'download_complete': {
         const name = (ev.filename || '').split('/').pop();
         toast(`저장됨: ${name}`, 'ok');
-        showPreview();   // 방금 저장된 이미지 미리보기
+        showPreview();      // 방금 저장된 이미지 미리보기
+        addToFilmstrip();   // 최근 썸네일 누적
         break;
       }
       case 'property_changed':
@@ -1050,6 +1071,36 @@
   document.getElementById('previewBox').addEventListener('click', () => {
     document.getElementById('previewBox').style.display = 'none';
   });
+
+  // ── 필름스트립 (최근 촬영 썸네일) ─────────────────────────────────────
+  // 서버는 최신 1장(/api/last_image)만 기억하므로, download_complete 시 즉시 로드해
+  // 캔버스로 다운스케일한 dataURL을 누적(이후 최신값으로 덮여도 로드된 픽셀은 보존).
+  // RAW(ARW 등 브라우저 미지원)는 onerror로 스킵. 썸네일 클릭=미리보기 확대.
+  const filmstrip = document.getElementById('filmstrip');
+  const recentCard = document.getElementById('recentCard');
+  const MAX_THUMBS = 12;
+  const addToFilmstrip = () => {
+    const probe = new Image();
+    probe.onload = () => {
+      const cap = 1024, sc = Math.min(1, cap / probe.naturalWidth);
+      const cw = Math.round(probe.naturalWidth * sc), ch = Math.round(probe.naturalHeight * sc);
+      const c = document.createElement('canvas'); c.width = cw; c.height = ch;
+      c.getContext('2d').drawImage(probe, 0, 0, cw, ch);
+      let url; try { url = c.toDataURL('image/jpeg', 0.8); } catch (e) { return; }
+      const thumb = document.createElement('img');
+      thumb.className = 'film-thumb'; thumb.src = url;
+      thumb.addEventListener('click', () => {
+        const box = document.getElementById('previewBox');
+        document.getElementById('previewImg').src = url;
+        box.style.display = 'block';
+      });
+      filmstrip.prepend(thumb);
+      while (filmstrip.children.length > MAX_THUMBS) filmstrip.lastChild.remove();
+      recentCard.style.display = '';
+    };
+    probe.onerror = () => {};                       // RAW 등 미지원 → 스킵
+    probe.src = '/api/last_image?t=' + Date.now();
+  };
 
   // ── ② 포커스 피킹 (클라이언트 엣지검출) ───────────────────────────────
   // LiveView 프레임을 작은 작업 캔버스로 다운샘플 → 명암차(Sobel 유사) →
@@ -1129,12 +1180,13 @@
     ];
   };
   lvWrap.addEventListener('click', (e) => {
-    if (e.target.closest('button')) return;                 // 오버레이 버튼(▦/↻) 클릭은 무시
-    if (!POSITIONAL_AREA.has(Number(afSize.value))) return; // 와이드/존/중앙/트래킹: 위치 무시
+    if (e.target.closest('button')) return;                 // 오버레이 버튼(🔍/▦/↻) 클릭은 무시
     const r = lvWrap.getBoundingClientRect();
     const sx = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
     const sy = Math.min(1, Math.max(0, (e.clientY - r.top) / r.height));
     const [nx, ny] = unrotateClick(sx, sy, r);
+    if (loupeOn) { lfx = nx; lfy = ny; return; }            // 줌 모드: 확대 지점 선택(AF 아님)
+    if (!POSITIONAL_AREA.has(Number(afSize.value))) return; // 와이드/존/중앙/트래킹: 위치 무시
     sendAfPoint(nx, ny, sx, sy);
   });
   document.getElementById('afCenterBtn').addEventListener('click', () => {
@@ -1155,6 +1207,7 @@
     const t = `rotate(${lvRot}deg) scale(${s})`;
     lvImg.style.transform = t;
     if (lvThirds) lvThirds.style.transform = t; // 그리드도 라이브뷰와 함께 회전
+    if (loupeCanvas) loupeCanvas.style.transform = t; // 루페도 동일 회전
   };
   rotBtn.addEventListener('click', () => {
     lvRot = (lvRot + 90) % 360;
@@ -1162,6 +1215,42 @@
     applyRot();
   });
   window.addEventListener('resize', applyRot);
+
+  // ── 100% 확대 초점확인 (루페) ─────────────────────────────────────────
+  // 라이브뷰 원본(lvImg.natural*) 픽셀을 1:1로 크롭해 캔버스에 그려 진짜 100% 확인.
+  // CSS transform과 얽히지 않게 별도 캔버스, 회전은 applyRot이 동일 변환 적용.
+  // 줌 모드 중 라이브뷰 클릭 = 확대 지점 선택(lfx/lfy, AF 아님 — 클릭 핸들러 참조).
+  const zoomBtn = document.getElementById('zoomBtn');
+  const loupeCanvas = document.getElementById('loupeCanvas');
+  const lctx = loupeCanvas.getContext('2d');
+  let loupeOn = false, lfx = 0.5, lfy = 0.5;
+  const drawLoupe = () => {
+    if (!loupeOn) return;
+    const nw = lvImg.naturalWidth, nh = lvImg.naturalHeight;
+    if (nw > 0) {
+      const r = lvWrap.getBoundingClientRect();
+      const cw = Math.round(r.width), ch = Math.round(r.height);
+      if (loupeCanvas.width !== cw) loupeCanvas.width = cw;
+      if (loupeCanvas.height !== ch) loupeCanvas.height = ch;
+      const sw = Math.min(cw, nw), sh = Math.min(ch, nh);   // 1:1 크롭(원본>표시일 때)
+      let sx = lfx * nw - sw / 2, sy = lfy * nh - sh / 2;
+      sx = Math.max(0, Math.min(nw - sw, sx));
+      sy = Math.max(0, Math.min(nh - sh, sy));
+      try {
+        lctx.fillStyle = '#000'; lctx.fillRect(0, 0, cw, ch);
+        lctx.drawImage(lvImg, sx, sy, sw, sh, 0, 0, cw, ch);
+      } catch (e) { /* LV 프레임 미준비 */ }
+    }
+    requestAnimationFrame(drawLoupe);
+  };
+  zoomBtn.addEventListener('click', () => {
+    loupeOn = !loupeOn;
+    zoomBtn.classList.toggle('on', loupeOn);
+    loupeCanvas.classList.toggle('on', loupeOn);
+    applyRot();                        // 루페에 현재 회전 변환 반영
+    if (loupeOn) requestAnimationFrame(drawLoupe);
+    else lctx.clearRect(0, 0, loupeCanvas.width, loupeCanvas.height);
+  });
 
   // ── 그리드 토글 (3분할 그리드 on/off, 기본 ON) ───────────────────────
   const gridBtn = document.getElementById('gridBtn');
