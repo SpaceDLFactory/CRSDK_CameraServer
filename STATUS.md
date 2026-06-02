@@ -81,7 +81,7 @@
 - ✅ **AF 영역 좌표 보정** — 실측+공식샘플로 확정. device property `AF_Area_Position`(0x0121, UInt32 `(x<<16)|y`, **x:0~639 y:0~479**) 사용. 종전 control code(0xD2DC)+0~10000은 오류였음. 좌표 지정 전 FocusArea=Flexible_Spot_S 자동 전환. 박스 위치 시각 확인 완료
 - ✅ **반셔터(S1) 버튼** — 누르고 유지=`S1 LOCKED`(AF 합초·고정), 떼면 UNLOCKED. 연사와 동일한 pointer press-hold. CAPTURE는 자체 AF 시퀀스 유지(반셔터는 사전 합초·확인용)
 - ✅ **AF 박스 크기 S/M/L** — af_point에 area 파라미터(FocusArea 0x04/05/06). 실기 3종 수용 확인(200), 잘못된 값은 S 폴백
-- ✅ **라이브뷰 회전 토글**(수동, ↻ 90°씩, lv-img CSS rotate+scale fit) — 세로 촬영 시 정위치. ⚠️ **자동회전(자이로) 불가**: A7C는 `CrLiveViewProperty_Level` 미노출(라이브뷰 켠 상태에서도 InvalidCalled 0x8402 확인). AF 클릭 좌표 회전 리맵은 미구현(증상1과 함께)
+- ✅ **라이브뷰 회전 토글**(수동, ↻ 90°씩, lv-img CSS rotate+scale fit) — 세로 촬영 시 정위치. ⚠️ **자동회전(자이로) 불가**: A7C는 `CrLiveViewProperty_Level` 미노출(라이브뷰 켠 상태에서도 InvalidCalled 0x8402 확인). ✅ 그리드도 라이브뷰와 동반 회전. ✅ AF 클릭 좌표 회전 리맵(`unrotateClick`): 화면 클릭에 `rotate(lvRot)·scale(s)` 역변환 적용→미회전 센서 좌표로 전송, 마커는 클릭한 화면 위치 표시(0°/90°/180°/270° 수치 검증). 미검증: 하드웨어
 - ✅ **Graceful shutdown** — SIGTERM/SIGINT 잡아 종료 전 카메라 disconnect. 종전엔 pkill(SIGTERM 미처리)로 세션이 남아 재연결 시 FailBusy(0x820B)→power cycle 필요했음. 이제 재시작 즉시 연결 검증됨
 - ✅ **AF 박스 클릭 정밀도** — `liveview_get_af_frame` FFI(0x0121 LV property)로 실위치 readback. 측정: X 선형(중앙 75%), Y는 S커브(중앙 압축, 0.25→0.14). `calib_y` 역보정(5점 실측표 역보간)으로 Y 선형화 → 하드웨어+시각 검증 완료(등간격 ~67, "괜찮아보임"). ⚠️ 보정표는 세션 간 ~4.5% offset 변동 가능(하드코딩 한계, 허용 수준)
 - ✅ **반셔터(S1)** — 정상 동작 확인: half/down→FocusIndication 1(Unlocked)→258(Focused-AFS), half/up 후 합초 유지. 이전 "불완전"은 렌즈 MF 스위치/대상 상태 문제였음(코드 정상). FocusIndication(0x707) 계기판으로 검증

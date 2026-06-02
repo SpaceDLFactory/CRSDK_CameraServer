@@ -1083,9 +1083,11 @@
   const afMarker = document.getElementById('afMarker');
   const lvWrap = document.querySelector('.lv');
   const afSize = document.getElementById('afSize');
-  const sendAfPoint = async (nx, ny) => {
-    afMarker.style.left = (nx * 100) + '%';
-    afMarker.style.top  = (ny * 100) + '%';
+  // nx,ny = 카메라에 보낼 미회전 센서 좌표. dispX,dispY = 마커 표시 좌표(화면 클릭 위치).
+  // 마커는 회전 변환을 받지 않는 형제라 화면 좌표로 찍어야 클릭한 곳에 보인다.
+  const sendAfPoint = async (nx, ny, dispX = nx, dispY = ny) => {
+    afMarker.style.left = (dispX * 100) + '%';
+    afMarker.style.top  = (dispY * 100) + '%';
     try {
       await fetch('/api/af_point', {
         method: 'POST',
@@ -1094,12 +1096,26 @@
       });
     } catch (e) { console.warn('af_point', e); }
   };
+  // 화면 클릭(정규화) → 미회전 센서 좌표: 표시 변환 rotate(lvRot)·scale(s)의 역.
+  const unrotateClick = (sx, sy, r) => {
+    if (lvRot % 360 === 0) return [sx, sy];
+    const s = (lvRot % 180 !== 0) ? Math.min(r.width, r.height) / Math.max(r.width, r.height) : 1;
+    const sox = (sx - 0.5) * r.width, soy = (sy - 0.5) * r.height; // 중심 기준 px
+    const rad = lvRot * Math.PI / 180, cos = Math.cos(rad), sin = Math.sin(rad);
+    const lox = ( cos * sox + sin * soy) / s;   // (1/s)·R(-θ)
+    const loy = (-sin * sox + cos * soy) / s;
+    return [
+      Math.min(1, Math.max(0, lox / r.width  + 0.5)),
+      Math.min(1, Math.max(0, loy / r.height + 0.5)),
+    ];
+  };
   lvWrap.addEventListener('click', (e) => {
     if (!POSITIONAL_AREA.has(Number(afSize.value))) return; // 와이드/존/중앙/트래킹: 위치 무시
     const r = lvWrap.getBoundingClientRect();
-    const nx = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
-    const ny = Math.min(1, Math.max(0, (e.clientY - r.top) / r.height));
-    sendAfPoint(nx, ny);
+    const sx = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
+    const sy = Math.min(1, Math.max(0, (e.clientY - r.top) / r.height));
+    const [nx, ny] = unrotateClick(sx, sy, r);
+    sendAfPoint(nx, ny, sx, sy);
   });
   document.getElementById('afCenterBtn').addEventListener('click', () => {
     if (!POSITIONAL_AREA.has(Number(afSize.value))) return;
@@ -1108,8 +1124,8 @@
   // AF 박스 크기 변경 → 즉시 카메라 FocusArea 설정 (275=0x0113). poll이 마커 크기 반영.
   afSize.addEventListener('change', () => setProp(275, Number(afSize.value)));
 
-  // 라이브뷰 회전 토글 — lv-img만 시각 회전(scale로 fit). 세로 촬영 시 화면 정위치.
-  // 주: A7C는 자이로 미노출이라 자동회전 불가 → 수동. AF 클릭 좌표 리맵은 추후(증상1).
+  // 라이브뷰 회전 토글 — lv-img+그리드 시각 회전(scale로 fit). 세로 촬영 시 화면 정위치.
+  // 주: A7C는 자이로 미노출이라 자동회전 불가 → 수동. AF 클릭은 unrotateClick으로 역보정.
   const rotBtn = document.getElementById('rotBtn');
   const lvThirds = document.querySelector('.lv-thirds');
   let lvRot = 0;
