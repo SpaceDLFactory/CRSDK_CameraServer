@@ -22,6 +22,7 @@ pub mod code {
     pub const METERING_MODE: u32 = 0x010A;
     pub const DRIVE_MODE: u32 = 0x010E;
     pub const FOCUS_MODE: u32 = 0x0109;
+    pub const FLASH_MODE: u32 = 0x010B; // CrFlashMode (Auto/Off/Fill/ExternalSync/Slow/Rear). 플래시 미장착 바디는 미노출
     pub const LENS_MODEL_NAME: u32 = 0x0765; // STR 타입 (A7C 미노출 — 다른 바디용)
     pub const RECORDING_STATE: u32 = 0x0705; // 0=정지 1=녹화중 2=실패 (읽기 전용)
     pub const SHUTTER_TYPE: u32 = 0x01A9;    // 1=Auto 2=기계 3=전자

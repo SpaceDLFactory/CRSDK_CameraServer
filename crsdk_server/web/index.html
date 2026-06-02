@@ -409,6 +409,7 @@
       <h3>Drive · Metering</h3>
       <div class="row"><span class="k">Drive</span><select class="sel" id="selDrive" data-code="270"></select></div>
       <div class="row"><span class="k">Metering</span><select class="sel" id="selMetering" data-code="266"></select></div>
+      <div class="row"><span class="k">Flash</span><select class="sel" id="selFlash" data-code="267"></select></div>
       <div class="row"><span class="k">Shutter</span><select class="sel" id="selShutterType" data-code="425"></select></div>
       <div class="row"><span class="k">Silent</span><select class="sel" id="selSilent" data-code="421"></select></div>
     </div>
@@ -708,6 +709,7 @@
   const selWb       = document.getElementById('selWb');
   const selDrive    = document.getElementById('selDrive');
   const selMetering = document.getElementById('selMetering');
+  const selFlash    = document.getElementById('selFlash');
   const selShutterType = document.getElementById('selShutterType');
   const selSilent   = document.getElementById('selSilent');
   const selFileType = document.getElementById('selFileType');
@@ -743,6 +745,8 @@
     0x17:'트래킹:확장 플렉서블',0x18:'트래킹:플렉서블',0x19:'플렉서블 XS',0x1A:'플렉서블 XL'};
   // 클릭으로 위치 지정이 먹히는 Flexible/Expand 계열만.
   const POSITIONAL_AREA = new Set([4,5,6,7,8,0x14,0x15,0x16,0x17,0x18,0x19,0x1A]);
+  // CrFlashMode (0x010B). 플래시 미장착/미지원 바디는 property 미노출 → capability가 카드 숨김.
+  const FLASH = {1:'자동',2:'끔',3:'강제발광',4:'외부동조',5:'슬로우싱크',6:'후막싱크'};
 
   // raw 값 → 라벨. 매핑/유효성 실패 시 null 반환 → fillSelect가 옵션에서 제외
   // (SDK가 allowed 배열에 끼워넣는 쓰레기값 방어).
@@ -787,6 +791,7 @@
     jpegq: v => JPEGQ[v] ?? null,
     pprofile: v => PPROFILE[v] ?? null,
     farea: v => FAREA[v] ?? null,
+    flash: v => FLASH[v] ?? null,
   };
 
   // allowed[]에서 디코딩 가능한 값만 <option>으로. 0 패딩·중복·SDK 쓰레기 제외.
@@ -832,6 +837,7 @@
       fillSelect(selWb, p.white_balance, dec.wb, true); // AWB(0)는 실제 값
       fillSelect(selDrive, p.drive_mode, dec.drive);
       fillSelect(selMetering, p.metering, dec.metering);
+      fillSelect(selFlash, p.flash_mode, dec.flash);
       fillSelect(selShutterType, p.shutter_type, dec.stype);
       fillSelect(selSilent, p.silent_mode, dec.silent);
       fillSelect(selFileType, p.file_type, dec.filetype);
@@ -936,7 +942,7 @@
   wbKelvin.addEventListener('input', () => { wbKelvinVal.textContent = wbKelvin.value + 'K'; });
   wbKelvin.addEventListener('change', () => setProp(277, wbKelvin.value)); // 277 = 0x0115 Colortemp
 
-  [selIso, selShutter, selAperture, selEv, selWb, selDrive, selMetering, selShutterType, selSilent, selFileType, selJpegQuality, selPicProfile].forEach(sel =>
+  [selIso, selShutter, selAperture, selEv, selWb, selDrive, selMetering, selFlash, selShutterType, selSilent, selFileType, selJpegQuality, selPicProfile].forEach(sel =>
     sel.addEventListener('change', () => setProp(sel.dataset.code, sel.value))
   );
 
