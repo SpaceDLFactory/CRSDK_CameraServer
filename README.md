@@ -95,6 +95,10 @@ If this project is useful to you:
 
 [![Support on Ctee](https://img.shields.io/badge/Ctee-sdlfactory-FF5A5F)](https://ctee.kr/place/sdlfactory)
 
+## Contact
+
+Questions, bug reports, or feedback: **spacedlfactory@gmail.com**
+
 ## License
 
 The source code in this repository is **MIT licensed** ([LICENSE](LICENSE)).
