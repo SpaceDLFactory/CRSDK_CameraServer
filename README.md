@@ -15,15 +15,19 @@ live view, and long-exposure/timelapse from any browser on your phone or PC.
 
 ## Features
 
-- **Live view** — MJPEG stream with focus peaking, rule-of-thirds grid, manual rotation
+- **Live view** — MJPEG stream with focus peaking, RGB histogram, toggleable
+  rule-of-thirds grid (rotates with the view), manual rotation
 - **Exposure & color** — ISO, shutter, aperture, EV, white balance (+ Kelvin slider),
-  metering, drive mode, file format, JPEG quality, Picture Profile
-- **Focus** — MF Near/Far slider, AF point by live-view click (Y-axis calibrated),
-  AF-area size S/M/L, half-shutter (S1) with focus-indication feedback
+  metering, drive mode, flash mode, file format, JPEG quality, Picture Profile
+- **Focus** — MF Near/Far slider, AF point by live-view click (Y-axis calibrated,
+  rotation-aware), AF-area mode (Wide/Zone/Center/Flexible S·M·L/Tracking),
+  half-shutter (S1) with focus-indication feedback
 - **Capture** — single, burst (press-hold), movie record, cancel
 - **Long exposure** — fixed 1″–30″, BULB, and a **software bulb timer** (1–900 s)
 - **Timelapse** — software interval shooting (count × interval) with cancel
 - **Save** — to PC with custom folder/prefix, capture preview, battery & shots-remaining
+- **Multi-body ready** — controls are curated from each body's reported
+  capabilities; properties a body does not expose are hidden automatically
 - **Robust** — auto-reconnect, graceful shutdown (clean camera session release)
 
 ## Screenshots
