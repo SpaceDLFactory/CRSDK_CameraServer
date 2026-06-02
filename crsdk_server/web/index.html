@@ -359,7 +359,7 @@
     <div class="lv-corner-bl"></div>
     <div class="lv-corner-br"></div>
     <div class="lv-info">
-      LIVE VIEW · <span class="v">1920 × 1280</span> · <span class="v">JPEG</span>
+      LIVE VIEW · <span class="v" id="lvRes">—</span> · <span class="v">JPEG</span>
     </div>
     <button class="lv-zoom" id="zoomBtn" type="button" title="100% 확대 초점확인 (클릭=지점 선택)">🔍</button>
     <button class="lv-grid" id="gridBtn" type="button" title="3분할 그리드 토글">▦</button>
@@ -865,6 +865,14 @@
       fillSelect(selPicProfile, p.picture_profile, dec.pprofile, true); // Off(0)은 실제 값
       if (p.color_temp) {
         const ct = p.color_temp;
+        // Range(0x4000)면 카메라가 준 [min, max, step]로 슬라이더 범위 설정 (실측: A7C 색온도).
+        // 값이 비정상(범위 밖/패딩)이면 건드리지 않고 HTML 기본(2500~9900/100K) 유지.
+        if ((ct.value_type & 0x4000) && ct.allowed && ct.allowed.length >= 3) {
+          const [mn, mx, st] = ct.allowed;
+          if (mn < mx && st > 0 && st < (mx - mn) && wbKelvin.min !== String(mn)) {
+            wbKelvin.min = mn; wbKelvin.max = mx; wbKelvin.step = st;
+          }
+        }
         if (document.activeElement !== wbKelvin) {   // 드래그 중이면 갱신 건너뜀
           wbKelvin.value = String(ct.value);
           wbKelvinVal.textContent = ct.value + 'K';
@@ -958,7 +966,8 @@
     nfSlider.value = '0';
     nfVal.textContent = '0';
   });
-  // WB 색온도 슬라이더 — 카메라가 켈빈 생값(5500 등)을 그대로 보고/수용. 범위 하드코딩(2500~9900/100K).
+  // WB 색온도 슬라이더 — 카메라가 켈빈 생값(5500 등)을 그대로 보고/수용. 범위는 Range property에서
+  // 불러오며(위 poll), 비정상/부재 시 HTML 기본(2500~9900/100K)으로 폴백.
   wbKelvin.addEventListener('input', () => { wbKelvinVal.textContent = wbKelvin.value + 'K'; });
   wbKelvin.addEventListener('change', () => setProp(277, wbKelvin.value)); // 277 = 0x0115 Colortemp
 
@@ -1271,8 +1280,15 @@
   hwork.width = HW; hwork.height = HH;
   const HCW = histCanvas.width, HCH = histCanvas.height; // 256 x 72 (bin=x 1:1)
   const histChans = [['#ff3b3b', 0], ['#3bff6b', 1], ['#3b7bff', 2]];
+  const lvResEl = document.getElementById('lvRes');
   const drawHist = () => {
-    if (!lvStreaming || lvImg.naturalWidth === 0) { hctx.clearRect(0, 0, HCW, HCH); return; }
+    if (!lvStreaming || lvImg.naturalWidth === 0) {
+      hctx.clearRect(0, 0, HCW, HCH);
+      if (lvResEl.textContent !== '—') lvResEl.textContent = '—';
+      return;
+    }
+    const res = `${lvImg.naturalWidth} × ${lvImg.naturalHeight}`;
+    if (lvResEl.textContent !== res) lvResEl.textContent = res; // 실제 LV 프레임 크기
     let data;
     try {
       hwctx.drawImage(lvImg, 0, 0, HW, HH);

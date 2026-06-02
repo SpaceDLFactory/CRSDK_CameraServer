@@ -496,51 +496,39 @@ int32_t get_device_properties(int64_t           handle,
          *   0x000B        → STR (string)  — skip, not an enumerable array
          *
          * Only array types (dt & 0x2000) have meaningful allowed_values. */
+        /* allowed_values 파싱.
+         *   Array(0x2000): 설정 가능한 원소들 (GetSetValueSize 개).
+         *   Range(0x4000): [min, max, step] (GetValueSize, 실측 A7C 색온도; 뒤는 0 패딩). 슬라이더 범위용.
+         *   String(0x000B)/스칼라: 파싱 안 함.
+         * (값 타입은 base nibble만; Sign/Array/Range/Custom 비트는 esz에 무관) */
         flat[i].allowed_count = 0;
-        uint32_t val_count = sdk_props[i].GetSetValueSize();
-        if (val_count > 0) {
-            uint32_t dt   = flat[i].value_type;
-            uint32_t base = dt & ~0x2000u;
+        uint32_t dt   = flat[i].value_type;
+        uint32_t base = dt & 0x000Fu;
+        size_t   esz  = (base == 1) ? 1u : (base == 2) ? 2u : (base == 3) ? 4u : 8u;
 
-            /* Skip string types and non-array scalars — their GetSetValueSize
-             * returns byte length, not element count. */
-            if (base == 0x000Bu || !(dt & 0x2000u)) {
-                /* nothing to parse */
-            } else {
-                const uint8_t* raw =
-                    static_cast<const uint8_t*>(sdk_props[i].GetValues());
-                if (raw) {
-                    /* Element size from base type (unsigned & signed share width) */
-                    size_t esz = ((base & 0x0003u) == 0x0001u) ? 1u   /* UInt8/Int8 */
-                               : ((base & 0x0003u) == 0x0002u) ? 2u   /* UInt16/Int16 */
-                               : ((base & 0x0003u) == 0x0003u) ? 4u   /* UInt32/Int32 */
-                               : 8u;                                    /* UInt64/Int64 */
-
-                    uint32_t cap = (val_count < CR_PROPERTY_MAX_ALLOWED)
-                                    ? val_count
-                                    : (uint32_t)CR_PROPERTY_MAX_ALLOWED;
-                    for (uint32_t j = 0; j < cap; ++j) {
-                        uint64_t v = 0;
-                        switch (esz) {
-                            case 1: v = raw[j]; break;
-                            case 2: {
-                                uint16_t t;
-                                __builtin_memcpy(&t, raw + j * 2, 2);
-                                v = t;
-                            } break;
-                            case 4: {
-                                uint32_t t;
-                                __builtin_memcpy(&t, raw + j * 4, 4);
-                                v = t;
-                            } break;
-                            default: {
-                                __builtin_memcpy(&v, raw + j * 8, 8);
-                            } break;
-                        }
-                        flat[i].allowed_values[j] = v;
+        uint32_t n = 0;
+        if (base != 0x000Bu) {
+            if (dt & 0x2000u)      n = sdk_props[i].GetSetValueSize(); /* array: 설정가능 원소 수 */
+            else if (dt & 0x4000u) n = sdk_props[i].GetValueSize();    /* range: min/step/max */
+        }
+        if (n > 0) {
+            const uint8_t* raw =
+                static_cast<const uint8_t*>(sdk_props[i].GetValues());
+            if (raw) {
+                uint32_t cap = (n < CR_PROPERTY_MAX_ALLOWED)
+                                ? n
+                                : (uint32_t)CR_PROPERTY_MAX_ALLOWED;
+                for (uint32_t j = 0; j < cap; ++j) {
+                    uint64_t v = 0;
+                    switch (esz) {
+                        case 1: v = raw[j]; break;
+                        case 2: { uint16_t t; __builtin_memcpy(&t, raw + j * 2, 2); v = t; } break;
+                        case 4: { uint32_t t; __builtin_memcpy(&t, raw + j * 4, 4); v = t; } break;
+                        default: __builtin_memcpy(&v, raw + j * 8, 8); break;
                     }
-                    flat[i].allowed_count = cap;
+                    flat[i].allowed_values[j] = v;
                 }
+                flat[i].allowed_count = cap;
             }
         }
     }

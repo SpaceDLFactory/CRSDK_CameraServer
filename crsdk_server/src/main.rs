@@ -948,6 +948,7 @@ struct PropView {
     value: u64,
     editable: bool,
     allowed: Vec<u64>,
+    value_type: u32, // CrDataType (Range 0x4000 등) — 프론트가 allowed 해석에 사용
 }
 
 #[derive(Serialize)]
@@ -992,6 +993,7 @@ async fn properties(State(s): State<AppState>) -> Response {
                     value: p.current,
                     editable: p.editable,
                     allowed: p.allowed.clone(),
+                    value_type: p.value_type,
                 })
             };
             use crsdk::properties::code;

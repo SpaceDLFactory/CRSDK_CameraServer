@@ -79,7 +79,7 @@
 ### Tier 2 — 촬영/포커스 확장 ★ 현재 작업 대상
 - ✅ **JPEG 품질**(StillImageQuality 0x0107) dropdown — 하드웨어 검증 완료(읽기+쓰기 왕복). allowed=[X.Fine/Fine/표준]
 - ✅ **Picture Profile**(0x01AA) dropdown — 하드웨어 검증 완료(0→3→0 왕복). Off+PP1~PP10. Off(0)이 실제 값이라 `fillSelect(...,allowZero=true)`로 0-필터 우회
-- ✅ **WB 켈빈 슬라이더** (Colortemp 0x0115) — 하드웨어+브라우저 검증 완료. value=생 켈빈(5500), WB=색온도(256)일 때만 editable→슬라이더 활성. 범위 **하드코딩 2500~9900/100K**(옵션 A), 실기에서 경계·중간값 쓰기 수용 + UI 활성화 확인
+- ✅ **WB 켈빈 슬라이더** (Colortemp 0x0115) — 하드웨어+브라우저 검증 완료. value=생 켈빈(5500), WB=색온도(256)일 때만 editable→슬라이더 활성. 범위는 **카메라 Range property에서 로드**(wrapper가 0x4000 Range를 [min,step,max]로 파싱, PropView.value_type 노출 → 프론트가 슬라이더 min/step/max 설정), 비정상/부재 시 **2500~9900/100K 폴백**. 실기에서 경계·중간값 쓰기 수용 + UI 활성화 확인. 미검증: Range 로드 실값(하드웨어)
 - ✅ **AF 영역 좌표 보정** — 실측+공식샘플로 확정. device property `AF_Area_Position`(0x0121, UInt32 `(x<<16)|y`, **x:0~639 y:0~479**) 사용. 종전 control code(0xD2DC)+0~10000은 오류였음. 좌표 지정 전 FocusArea=Flexible_Spot_S 자동 전환. 박스 위치 시각 확인 완료
 - ✅ **반셔터(S1) 버튼** — 누르고 유지=`S1 LOCKED`(AF 합초·고정), 떼면 UNLOCKED. 연사와 동일한 pointer press-hold. CAPTURE는 자체 AF 시퀀스 유지(반셔터는 사전 합초·확인용)
 - ✅ **AF 박스 크기 S/M/L** — af_point에 area 파라미터(FocusArea 0x04/05/06). 실기 3종 수용 확인(200), 잘못된 값은 S 폴백
