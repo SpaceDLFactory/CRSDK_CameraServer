@@ -93,7 +93,9 @@
 - 🚫 A7C 미지원 확인됨(덤프 대조): RAW압축(0x0131), Creative Look(0x01C5) — 둘 다 카메라가 property 자체를 노출 안 함. SDK에 Creative Style 대체 property 없음. ⚠️ WB AWB(0)도 0-필터로 현재값 아닐 때 선택 불가한 기존 버그 존재(범위 외)
 
 ### Tier 3 — 뷰·편의
-- ❌ 히스토그램, 그리드 토글, 100% 확대 초점확인, 촬영 히스토리/필름스트립, LiveView 다중 클라이언트
+- ✅ **그리드 토글** — 라이브뷰 우상단 ▦ 버튼, 3분할 그리드 on/off(기본 ON, `.lv-thirds` display)
+- ✅ **히스토그램** — 우측 패널 카드(라이브뷰 위 오버레이 X, 어두운 장면 시인성). 라이브뷰 프레임 240×160 다운샘플 → RGB 256-bin, 가산합성(lighter) 렌더, setInterval ~8fps, 피킹과 별도 캔버스. 미검증: 하드웨어(라이브뷰 피드 필요)
+- ❌ 100% 확대 초점확인, 촬영 히스토리/필름스트립, LiveView 다중 클라이언트
 
 ### 마지막 순위 — WiFi/SSH 연결
 - ❌ **WiFi/SSH 연결** — lib에 연결 인증 경로(`ConnectMode::Wifi`+`get_fingerprint`)는 있으나, ① 카메라 발견이 `EnumCameraObjects` 자동탐색뿐(IP 등록 `CreateCameraObjectInfoEthernetConnection` FFI 미구현) ② A7C의 SDK WiFi 테더링 지원 여부 미검증. 착수 전 자동발견 실측 진단(경로 A/B 분기) 필요

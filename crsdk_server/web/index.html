@@ -96,14 +96,17 @@
     box-shadow: 0 0 0 1px rgba(0,0,0,0.5);
     left: 50%; top: 50%;
   }
-  .lv-rotate {
-    position: absolute; top: 8px; right: 8px; z-index: 6;
+  .lv-rotate, .lv-grid {
+    position: absolute; top: 8px; z-index: 6;
     width: 34px; height: 34px; border-radius: 6px;
     background: rgba(0,0,0,0.45); color: var(--fg);
     border: 1px solid rgba(255,255,255,0.25); cursor: pointer;
     font-size: 18px; line-height: 1;
   }
-  .lv-rotate:hover { background: rgba(0,0,0,0.7); }
+  .lv-rotate { right: 8px; }
+  .lv-grid   { right: 50px; font-size: 15px; }
+  .lv-rotate:hover, .lv-grid:hover { background: rgba(0,0,0,0.7); }
+  .lv-grid.off { opacity: 0.45; }
   .lv-frame {
     position: absolute; inset: 12px;
     border: 1px solid var(--line);
@@ -150,6 +153,10 @@
     border: 1px solid var(--line);
     border-radius: 4px;
     padding: 10px 12px;
+  }
+  .hist-canvas {
+    display: block; width: 100%; height: 72px;
+    background: #0a0a0a; border-radius: 3px;
   }
   .card h3 {
     font-size: 10px;
@@ -340,10 +347,16 @@
     <div class="lv-info">
       LIVE VIEW · <span class="v">1920 × 1280</span> · <span class="v">JPEG</span>
     </div>
+    <button class="lv-grid" id="gridBtn" type="button" title="3분할 그리드 토글">▦</button>
     <button class="lv-rotate" id="rotBtn" type="button" title="라이브뷰 회전">↻</button>
   </div>
 
   <div class="panel">
+
+    <div class="card">
+      <h3>Histogram</h3>
+      <canvas class="hist-canvas" id="histCanvas" width="256" height="72"></canvas>
+    </div>
 
     <div class="card">
       <h3>Exposure</h3>
@@ -1110,6 +1123,7 @@
     ];
   };
   lvWrap.addEventListener('click', (e) => {
+    if (e.target.closest('button')) return;                 // 오버레이 버튼(▦/↻) 클릭은 무시
     if (!POSITIONAL_AREA.has(Number(afSize.value))) return; // 와이드/존/중앙/트래킹: 위치 무시
     const r = lvWrap.getBoundingClientRect();
     const sx = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
@@ -1142,6 +1156,52 @@
     applyRot();
   });
   window.addEventListener('resize', applyRot);
+
+  // ── 그리드 토글 (3분할 그리드 on/off, 기본 ON) ───────────────────────
+  const gridBtn = document.getElementById('gridBtn');
+  let gridOn = true;
+  gridBtn.addEventListener('click', () => {
+    gridOn = !gridOn;
+    lvThirds.style.display = gridOn ? '' : 'none';
+    gridBtn.classList.toggle('off', !gridOn);
+  });
+
+  // ── 히스토그램 (우측 패널, 라이브뷰 프레임 샘플링 → RGB 256-bin) ──────
+  // 라이브뷰 위 오버레이 대신 패널에 표시(어두운 장면 시인성). 피킹과 별도 캔버스.
+  const histCanvas = document.getElementById('histCanvas');
+  const hctx = histCanvas.getContext('2d');
+  const hwork = document.createElement('canvas');
+  const hwctx = hwork.getContext('2d', { willReadFrequently: true });
+  const HW = 240, HH = 160;                       // 샘플 해상도(다운스케일)
+  hwork.width = HW; hwork.height = HH;
+  const HCW = histCanvas.width, HCH = histCanvas.height; // 256 x 72 (bin=x 1:1)
+  const histChans = [['#ff3b3b', 0], ['#3bff6b', 1], ['#3b7bff', 2]];
+  const drawHist = () => {
+    if (!lvStreaming || lvImg.naturalWidth === 0) { hctx.clearRect(0, 0, HCW, HCH); return; }
+    let data;
+    try {
+      hwctx.drawImage(lvImg, 0, 0, HW, HH);
+      data = hwctx.getImageData(0, 0, HW, HH).data;
+    } catch (e) { return; }                        // LV 전환 중 프레임 미준비
+    const bins = [new Uint32Array(256), new Uint32Array(256), new Uint32Array(256)];
+    for (let i = 0; i < data.length; i += 4) {
+      bins[0][data[i]]++; bins[1][data[i+1]]++; bins[2][data[i+2]]++;
+    }
+    let mx = 1;
+    for (let x = 0; x < 256; x++) mx = Math.max(mx, bins[0][x], bins[1][x], bins[2][x]);
+    hctx.clearRect(0, 0, HCW, HCH);
+    hctx.globalCompositeOperation = 'lighter';     // RGB 가산합성(겹침=흰색)
+    for (const [color, ch] of histChans) {
+      hctx.fillStyle = color;
+      const b = bins[ch];
+      for (let x = 0; x < 256; x++) {
+        const h = (b[x] / mx) * HCH;
+        if (h > 0) hctx.fillRect(x, HCH - h, 1, h);
+      }
+    }
+    hctx.globalCompositeOperation = 'source-over';
+  };
+  setInterval(drawHist, 120);                       // ~8fps
 </script>
 </body>
 </html>
