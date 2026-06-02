@@ -418,7 +418,7 @@
         <button class="btn" id="peakBtn" type="button">피킹 OFF</button>
         <button class="btn" id="afCenterBtn" type="button">AF 중앙</button>
       </div>
-      <div class="row" style="margin-top:6px;"><span class="k">AF 박스</span><select class="sel" id="afSize"><option value="4">S</option><option value="5">M</option><option value="6">L</option></select></div>
+      <div class="row" style="margin-top:6px;"><span class="k">AF 영역</span><select class="sel" id="afSize"><option value="4">플렉서블 S</option><option value="5">플렉서블 M</option><option value="6">플렉서블 L</option></select></div>
       <button class="btn" id="halfBtn" type="button" style="width:100%;margin-top:6px;">반셔터 (누르고 유지 → AF)</button>
       <div class="row" style="margin-top:6px;color:var(--fg-mute);font-size:10px;">
         <span>AF 포인트: LiveView 클릭 (기본 중앙)</span>
@@ -693,6 +693,13 @@
     0x60001:'WB브라켓Lo',0x60002:'WB브라켓Hi',0x70001:'DRO브라켓Lo',0x70002:'DRO브라켓Hi'};
   const METER = {1:'평균',2:'중앙중점평균',3:'멀티스팟',4:'중앙스팟',5:'멀티',6:'중앙중점',
     7:'전체화면평균',8:'스팟(표준)',9:'스팟(대)',0xA:'하이라이트중점',0xB:'표준',0xC:'역광',0xD:'스포트라이트'};
+  // CrFocusArea (0x0113). Tracking 계열은 트래킹: 접두.
+  const FAREA = {1:'와이드',2:'존',3:'중앙',4:'플렉서블 S',5:'플렉서블 M',6:'플렉서블 L',
+    7:'확장 플렉서블',8:'플렉서블',0x11:'트래킹:와이드',0x12:'트래킹:존',0x13:'트래킹:중앙',
+    0x14:'트래킹:플렉서블 S',0x15:'트래킹:플렉서블 M',0x16:'트래킹:플렉서블 L',
+    0x17:'트래킹:확장 플렉서블',0x18:'트래킹:플렉서블',0x19:'플렉서블 XS',0x1A:'플렉서블 XL'};
+  // 클릭으로 위치 지정이 먹히는 Flexible/Expand 계열만.
+  const POSITIONAL_AREA = new Set([4,5,6,7,8,0x14,0x15,0x16,0x17,0x18,0x19,0x1A]);
 
   // raw 값 → 라벨. 매핑/유효성 실패 시 null 반환 → fillSelect가 옵션에서 제외
   // (SDK가 allowed 배열에 끼워넣는 쓰레기값 방어).
@@ -736,6 +743,7 @@
     filetype: v => ({0:'—',1:'JPEG',2:'RAW',3:'RAW+JPEG',4:'RAW+HEIF',5:'HEIF'}[v] ?? null),
     jpegq: v => JPEGQ[v] ?? null,
     pprofile: v => PPROFILE[v] ?? null,
+    farea: v => FAREA[v] ?? null,
   };
 
   // allowed[]에서 디코딩 가능한 값만 <option>으로. 0 패딩·중복·SDK 쓰레기 제외.
@@ -807,13 +815,14 @@
         const n = p.remain_shots.value;
         document.getElementById('shotsVal').textContent = (n == null) ? '—' : n.toLocaleString();
       }
-      // AF 박스 마커 크기 = 카메라 실제 FocusArea(S/M/L) 반영 (px는 근사 시각표시)
+      // AF 영역(0x0113): 카메라 allowed로 드롭다운 채움 + 마커 크기/표시 반영.
+      fillSelect(afSize, p.focus_area, dec.farea);
       if (p.focus_area) {
         const fa = p.focus_area.value;
-        const sz = { 4: 40, 5: 58, 6: 82 }[fa] || 56;
+        const sz = { 4: 40, 5: 58, 6: 82, 7: 70, 0x19: 30, 0x1A: 96 }[fa] || 56;
         afMarker.style.width = sz + 'px';
         afMarker.style.height = sz + 'px';
-        if ([4, 5, 6].includes(fa) && document.activeElement !== afSize) afSize.value = String(fa);
+        afMarker.style.display = POSITIONAL_AREA.has(fa) ? '' : 'none'; // 위치 지정 모드만 마커
       }
     } catch (e) { console.warn('properties poll fail', e); }
   };
@@ -1056,23 +1065,30 @@
     } catch (e) { console.warn('af_point', e); }
   };
   lvWrap.addEventListener('click', (e) => {
+    if (!POSITIONAL_AREA.has(Number(afSize.value))) return; // 와이드/존/중앙/트래킹: 위치 무시
     const r = lvWrap.getBoundingClientRect();
     const nx = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
     const ny = Math.min(1, Math.max(0, (e.clientY - r.top) / r.height));
     sendAfPoint(nx, ny);
   });
-  document.getElementById('afCenterBtn').addEventListener('click', () => sendAfPoint(0.5, 0.5));
+  document.getElementById('afCenterBtn').addEventListener('click', () => {
+    if (!POSITIONAL_AREA.has(Number(afSize.value))) return;
+    sendAfPoint(0.5, 0.5);
+  });
   // AF 박스 크기 변경 → 즉시 카메라 FocusArea 설정 (275=0x0113). poll이 마커 크기 반영.
   afSize.addEventListener('change', () => setProp(275, Number(afSize.value)));
 
   // 라이브뷰 회전 토글 — lv-img만 시각 회전(scale로 fit). 세로 촬영 시 화면 정위치.
   // 주: A7C는 자이로 미노출이라 자동회전 불가 → 수동. AF 클릭 좌표 리맵은 추후(증상1).
   const rotBtn = document.getElementById('rotBtn');
+  const lvThirds = document.querySelector('.lv-thirds');
   let lvRot = 0;
   const applyRot = () => {
     const r = lvWrap.getBoundingClientRect();
     const s = (lvRot % 180 !== 0) ? Math.min(r.width, r.height) / Math.max(r.width, r.height) : 1;
-    lvImg.style.transform = `rotate(${lvRot}deg) scale(${s})`;
+    const t = `rotate(${lvRot}deg) scale(${s})`;
+    lvImg.style.transform = t;
+    if (lvThirds) lvThirds.style.transform = t; // 그리드도 라이브뷰와 함께 회전
   };
   rotBtn.addEventListener('click', () => {
     lvRot = (lvRot + 90) % 360;
