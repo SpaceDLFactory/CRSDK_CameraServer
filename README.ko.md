@@ -21,6 +21,17 @@
 - **저장** — PC 저장(폴더·접두사), 촬영 미리보기, 배터리·남은 컷
 - **안정성** — 자동 재연결, graceful shutdown(카메라 세션 클린 해제)
 
+## 스크린샷
+
+단일 페이지 **Tether Console** — 왼쪽은 포커스 피킹·3분할 그리드가 얹힌 라이브뷰,
+오른쪽은 모든 컨트롤.
+
+| 연결됨 | 라이브뷰 (AF) |
+|---|---|
+| ![연결 UI](gallery/ui-connected.png) | ![라이브뷰](gallery/ui-liveview.png) |
+
+![전체 UI, 미연결](gallery/ui-disconnected.png)
+
 ## 아키텍처
 
 ```

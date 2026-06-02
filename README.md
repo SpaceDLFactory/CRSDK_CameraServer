@@ -26,6 +26,17 @@ live view, and long-exposure/timelapse from any browser on your phone or PC.
 - **Save** — to PC with custom folder/prefix, capture preview, battery & shots-remaining
 - **Robust** — auto-reconnect, graceful shutdown (clean camera session release)
 
+## Screenshots
+
+The single-page **Tether Console** — live view with focus peaking and a rule-of-thirds
+grid on the left, all controls on the right.
+
+| Connected | Live view (AF) |
+|---|---|
+| ![connected UI](gallery/ui-connected.png) | ![live view](gallery/ui-liveview.png) |
+
+![full UI, disconnected](gallery/ui-disconnected.png)
+
 ## Architecture
 
 ```
