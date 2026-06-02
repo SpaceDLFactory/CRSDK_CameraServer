@@ -65,6 +65,7 @@ AppState {
 | GET | `/api/status` | 연결상태·model·handle·save_path |
 | POST | `/api/connect` `/disconnect` | 연결 (PriorityKey=PCRemote + set_save_info 자동) |
 | GET | `/api/properties` | ISO/SS/Av/EV/WB/Drive/Metering/FileType/Focus/Save 현재값+allowed |
+| GET | `/api/capabilities` | 연결 바디 model + 노출 property code 집합 (프론트 UI 큐레이션) |
 | POST | `/api/property` `{code,value}` | 속성 쓰기 (Fetch-Modify-Set) |
 | POST | `/api/shutter` | focus mode 감지 → MF: capture / AF: capture_af |
 | POST | `/api/savepath` `{path}` | 저장 폴더 변경 |
@@ -132,6 +133,7 @@ cargo run -p crsdk_server     # http://localhost:8080/web/index.html
 - LiveView 단일 클라이언트 / 해상도 변경 시 버퍼 재할당 미처리
 - AF 셔터는 시간 기반(500ms) — FocusIndication(0x0707)으로 합초 확인 가능
 - ExposureProgramMode(PASM)는 A7C 물리 다이얼이라 SDK 쓰기 불가 (allowed 비어 비활성)
-- AF 좌표 보정(`calib_y`)은 FocusArea=M 기준 실측표 — 세션 간 ~5% 변동 가능
-- 다음 후보: 히스토그램, 100% 확대 초점확인, 바디 추상화(멀티바디), WiFi/SSH
+- AF 좌표 보정(`AfCalib`/`af_calib(model)`)은 모델별 키화 — A7C=실측표(FocusArea=M 기준), 미측정 바디=선형 폴백. 세션 간 ~5% 변동 가능
+- 바디 추상화: `capability.rs`(Capabilities/probe/has) + `/api/capabilities` + 프론트 큐레이션 완료(step 1~4). step 5(소프트 폴백 일원화)는 네이티브 UI 생길 때 보류
+- 다음 후보: 100% 확대 초점확인, 촬영 히스토리/필름스트립, WiFi/SSH
 - (기능 현황 전체는 `STATUS.md`)

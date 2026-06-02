@@ -30,6 +30,7 @@
 | `GET /api/last_image` | 마지막 PC 저장 이미지 (미리보기) |
 | `GET /events` (SSE) | DownloadComplete·PropertyChanged·Disconnected·Error |
 | `GET /lv` (MJPEG) | LiveView 영상 |
+| `GET /api/capabilities` | 연결 바디의 model + 노출 property code 집합 (프론트 UI 큐레이션) |
 | `GET /api/_debug/codes` | 카메라가 보고하는 전체 property code 덤프 (진단용) |
 
 ## 3. 구현 완료 기능
@@ -90,7 +91,7 @@
 - ⚠️ 운영 교훈: 서버 재시작 시 **중복 프로세스** 주의(둘이 카메라 물면 ConnectTimeout 0x8208). graceful shutdown으로 단일 종료는 해결됨
 - ✅ **인터벌/타임랩스** — A7C는 내장 인터벌 설정 미노출 → **소프트웨어 인터벌**(`/api/interval {interval_sec,count}` + `/stop`, 백그라운드 루프, 1초 단위 취소). 하드웨어 검증(2장 촬영, 409 중복거부, 정지/재시작). MF 권장, RAW는 간격 ≥10초
 - 🔧 **dropdown 라벨 중복 제거** — fillSelect가 같은 라벨(연속브라켓/싱글브라켓/연속타이머 등 변종)을 1개로 접음. 카메라가 보고하는 변종 도배 해소
-- 🚫 A7C 미지원 확인됨(덤프 대조): RAW압축(0x0131), Creative Look(0x01C5) — 둘 다 카메라가 property 자체를 노출 안 함. SDK에 Creative Style 대체 property 없음. ⚠️ WB AWB(0)도 0-필터로 현재값 아닐 때 선택 불가한 기존 버그 존재(범위 외)
+- 🚫 A7C 미지원 확인됨(덤프 대조): RAW압축(0x0131), Creative Look(0x01C5) — 둘 다 카메라가 property 자체를 노출 안 함. SDK에 Creative Style 대체 property 없음. ✅ WB AWB(0) 0-필터 버그 수정: `fillSelect(selWb,...,allowZero=true)`로 현재값이 AWB 아니어도 드롭다운에 노출 (벌브·PP Off와 동일 처리)
 
 ### Tier 3 — 뷰·편의
 - ✅ **그리드 토글** — 라이브뷰 우상단 ▦ 버튼, 3분할 그리드 on/off(기본 ON, `.lv-thirds` display)
