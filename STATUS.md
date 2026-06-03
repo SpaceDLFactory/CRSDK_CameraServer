@@ -99,7 +99,7 @@
 - ✅ **히스토그램** — 우측 패널 카드(라이브뷰 위 오버레이 X, 어두운 장면 시인성). 라이브뷰 프레임 240×160 다운샘플 → RGB 256-bin, 가산합성(lighter) 렌더, setInterval ~8fps, 피킹과 별도 캔버스. 미검증: 하드웨어(라이브뷰 피드 필요)
 - ✅ **100% 확대 초점확인** — 라이브뷰 우상단 🔍 토글, 루페 캔버스가 lvImg 원본 픽셀을 1:1 크롭 표시(MF 정밀초점). 줌 모드 클릭=확대 지점 선택(AF 아님), 회전은 applyRot 동일 변환. CSS transform과 분리(별도 캔버스). 미검증: 하드웨어
 - ✅ **필름스트립** — 우측 Recent 카드, download_complete마다 `/api/last_image` 즉시 로드→캔버스 다운스케일 dataURL 누적(서버는 최신 1장만 기억하나 로드된 픽셀 보존, 최대 12장). RAW는 onerror 스킵, 썸네일 클릭=미리보기 확대. 서버 무변경. 미검증: 하드웨어
-- ⏸ LiveView 다중 클라이언트 — 보류(현재 단일 MJPEG fetch 루프 가정 → 프레임 fan-out/broadcast 서버 동시성 개조 필요, 결이 다른 아키텍처 작업)
+- ✅ **LiveView 다중 클라이언트** — 카메라당 **단일 프로듀서**(LiveViewStream 하나)가 16ms fetch → `broadcast`로 fan-out, 각 `/lv`는 구독만(SDK 라이브뷰 접근 1개). 프로듀서는 첫 시청자에 시작(lv_running 락으로 단일 보장), 카메라 해제 시 종료→재연결 후 재시작. 검증: 하드웨어(2·3 클라 동시 각 118~119프레임 동일 수신, producer started 1회). ⚠️ 브라우저 닫혀도 연결 중 상시 가동(broadcast 무손실·비블로킹이라 hyper가 끊긴 Receiver를 즉시 안 드롭→시청자-0 종료 비신뢰 → 상시 가동으로 단순화, idle ~2.5% CPU)
 
 ### 마지막 순위 — WiFi/SSH 연결
 - ❌ **WiFi/SSH 연결** — lib에 연결 인증 경로(`ConnectMode::Wifi`+`get_fingerprint`)는 있으나, ① 카메라 발견이 `EnumCameraObjects` 자동탐색뿐(IP 등록 `CreateCameraObjectInfoEthernetConnection` FFI 미구현) ② A7C의 SDK WiFi 테더링 지원 여부 미검증. 착수 전 자동발견 실측 진단(경로 A/B 분기) 필요

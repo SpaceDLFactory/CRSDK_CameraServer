@@ -33,7 +33,7 @@ use crsdk::{
 };
 use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, Mutex};
-use tokio_stream::{wrappers::{BroadcastStream, ReceiverStream}, Stream, StreamExt};
+use tokio_stream::{wrappers::BroadcastStream, Stream, StreamExt};
 use tower_http::services::ServeDir;
 
 // ── macOS USB 간섭 억제 (ptpcamerad) ────────────────────────────────────
@@ -102,6 +102,8 @@ struct AppState {
     last_image: Arc<Mutex<Option<String>>>, // 마지막 PC 저장 파일 경로 (미리보기)
     bulb_active: Arc<std::sync::atomic::AtomicBool>, // 벌브 타이머 노출 진행중 (중복 트리거 방지)
     interval_active: Arc<std::sync::atomic::AtomicBool>, // 인터벌 촬영 진행중 (취소 신호 겸용)
+    lv_tx: broadcast::Sender<Arc<Vec<u8>>>, // LiveView 프레임 fan-out (다중 클라이언트)
+    lv_running: Arc<std::sync::Mutex<bool>>, // LiveView 프로듀서 가동 여부 (시작/종료 race 방지용 락)
 }
 
 // ── /api/status DTO ─────────────────────────────────────────────────────
@@ -852,11 +854,53 @@ async fn events(State(s): State<AppState>) -> Sse<impl Stream<Item = Result<Even
     Sse::new(stream).keep_alive(KeepAlive::default())
 }
 
-// ── LiveView MJPEG 스트림 ────────────────────────────────────────────────
-// multipart/x-mixed-replace — 브라우저 <img>가 디코딩. 단일 클라이언트 PoC.
-// spawn_blocking 스레드가 LiveViewStream을 소유하며 16ms마다 프레임을 fetch,
-// bounded 채널(cap 2)로 전달. 클라이언트가 끊기면 blocking_send Err → 루프 종료
-// → LiveViewStream Drop(버퍼 해제). 중간 해상도 변경 재할당은 미처리(제한사항).
+// ── LiveView MJPEG 스트림 (다중 클라이언트 fan-out) ──────────────────────
+// multipart/x-mixed-replace — 브라우저 <img>가 디코딩.
+// 카메라당 단일 프로듀서(spawn_blocking)가 LiveViewStream을 소유하며 16ms마다 프레임을
+// fetch → broadcast로 모든 구독자에 fan-out. 각 /lv 요청은 구독만 하므로 SDK 라이브뷰
+// 접근은 항상 하나뿐(다중 클라이언트가 버퍼를 다투지 않음). 프로듀서는 첫 시청자에 시작,
+// 카메라 해제(fetch 에러) 시 종료 → lv_running=false → 재연결 후 다음 /lv가 재시작.
+// (브라우저가 닫혀도 연결 중엔 계속 가동: broadcast는 무손실·비블로킹이라 hyper가 끊긴
+//  Receiver를 즉시 드롭하지 않아 시청자-0 종료를 신뢰할 수 없음 → 상시 가동으로 단순화.)
+fn lv_producer(handle: i64, lv_tx: broadcast::Sender<Arc<Vec<u8>>>, running: Arc<std::sync::Mutex<bool>>) {
+    // 연결 직후 카메라가 LiveView를 준비하는 데 시간이 필요 → 최대 4s 재시도
+    let mut lv = None;
+    for _ in 0..20 {
+        match LiveViewStream::new(handle) {
+            Ok(s) => { lv = Some(s); break; }
+            Err(SdkError::LiveViewUnavailable) => std::thread::sleep(Duration::from_millis(200)),
+            Err(_) => { *running.lock().unwrap() = false; return; }
+        }
+    }
+    let lv = match lv {
+        Some(s) => s,
+        None => {
+            tracing::warn!("lv: LiveViewStream unavailable after retries");
+            *running.lock().unwrap() = false;
+            return;
+        }
+    };
+    tracing::info!("lv: producer started");
+
+    let mut sent: u64 = 0;
+    loop {
+        match lv.fetch_frame() {
+            Ok(frame) if !frame.is_empty() => {
+                let _ = lv_tx.send(Arc::new(frame)); // 구독자 0이어도 무손실 송신(스킵)
+                sent += 1;
+            }
+            Ok(_) => std::thread::sleep(Duration::from_millis(16)), // 아직 새 프레임 없음
+            Err(e) => {
+                tracing::warn!("lv: fetch error after {sent} frames: {e:?}");
+                *running.lock().unwrap() = false;
+                break;
+            }
+        }
+    }
+    tracing::info!("lv: producer ended ({sent} frames)");
+    // lv drops here → liveview_free_block
+}
+
 async fn liveview(State(s): State<AppState>) -> Response {
     let handle = {
         let guard = s.camera.lock().await;
@@ -868,68 +912,31 @@ async fn liveview(State(s): State<AppState>) -> Response {
         }
     };
 
-    let (tx, rx) = tokio::sync::mpsc::channel::<Vec<u8>>(2);
+    // 먼저 구독 → receiver_count ≥ 1 보장(프로듀서가 곧바로 종료하지 않도록).
+    let rx = s.lv_tx.subscribe();
 
-    tokio::task::spawn_blocking(move || {
-        // 연결 직후 카메라가 LiveView를 준비하는 데 시간이 필요 → 최대 4s 재시도
-        let mut lv = None;
-        for _ in 0..20 {
-            match LiveViewStream::new(handle) {
-                Ok(s) => {
-                    lv = Some(s);
-                    break;
-                }
-                Err(SdkError::LiveViewUnavailable) => {
-                    std::thread::sleep(Duration::from_millis(200));
-                }
-                Err(_) => return,
-            }
+    // 프로듀서 미가동이면 시작 (단일 프로듀서). 락으로 종료 판정과 직렬화.
+    {
+        let mut running = s.lv_running.lock().unwrap();
+        if !*running {
+            *running = true;
+            let lv_tx = s.lv_tx.clone();
+            let running_c = s.lv_running.clone();
+            tokio::task::spawn_blocking(move || lv_producer(handle, lv_tx, running_c));
         }
-        let lv = match lv {
-            Some(s) => s,
-            None => {
-                tracing::warn!("lv: LiveViewStream unavailable after retries");
-                return;
-            }
-        };
-        tracing::info!("lv: stream started");
+    }
 
-        let mut sent: u64 = 0;
-        let mut empty: u64 = 0;
-        loop {
-            match lv.fetch_frame() {
-                Ok(frame) if !frame.is_empty() => {
-                    let n = frame.len();
-                    if tx.blocking_send(frame).is_err() {
-                        break; // 클라이언트 연결 종료
-                    }
-                    sent += 1;
-                    if sent <= 3 || sent.is_multiple_of(30) {
-                        tracing::info!("lv: sent frame #{sent} ({n} bytes, empty-polls={empty})");
-                    }
-                }
-                Ok(_) => {
-                    empty += 1;
-                    std::thread::sleep(Duration::from_millis(16)); // 아직 새 프레임 없음
-                }
-                Err(e) => {
-                    tracing::warn!("lv: fetch error after {sent} frames: {e:?}");
-                    break;
-                }
-            }
+    let stream = BroadcastStream::new(rx).filter_map(|r| match r {
+        Ok(frame) => {
+            let mut buf = Vec::with_capacity(frame.len() + 80);
+            buf.extend_from_slice(b"--frame\r\nContent-Type: image/jpeg\r\nContent-Length: ");
+            buf.extend_from_slice(frame.len().to_string().as_bytes());
+            buf.extend_from_slice(b"\r\n\r\n");
+            buf.extend_from_slice(&frame);
+            buf.extend_from_slice(b"\r\n");
+            Some(Ok::<_, std::io::Error>(buf))
         }
-        tracing::info!("lv: stream ended ({sent} frames sent)");
-        // lv drops here → liveview_free_block
-    });
-
-    let stream = ReceiverStream::new(rx).map(|frame| {
-        let mut buf = Vec::with_capacity(frame.len() + 80);
-        buf.extend_from_slice(b"--frame\r\nContent-Type: image/jpeg\r\nContent-Length: ");
-        buf.extend_from_slice(frame.len().to_string().as_bytes());
-        buf.extend_from_slice(b"\r\n\r\n");
-        buf.extend_from_slice(&frame);
-        buf.extend_from_slice(b"\r\n");
-        Ok::<_, std::io::Error>(buf)
+        Err(_) => None, // lagged(느린 클라) → 해당 프레임 스킵
     });
 
     Response::builder()
@@ -1093,6 +1100,8 @@ async fn main() {
         last_image: Arc::new(Mutex::new(None)),
         bulb_active: Arc::new(std::sync::atomic::AtomicBool::new(false)),
         interval_active: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+        lv_tx: broadcast::channel::<Arc<Vec<u8>>>(4).0,
+        lv_running: Arc::new(std::sync::Mutex::new(false)),
     };
 
     // 자동 (재)연결 루프: 미연결 상태면 3초마다 connect 시도.

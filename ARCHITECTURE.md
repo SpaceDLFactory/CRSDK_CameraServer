@@ -130,7 +130,7 @@ cargo run -p crsdk_server     # http://localhost:8080/web/index.html
 
 ## 10. 알려진 부채 / 다음 후보
 
-- LiveView 단일 클라이언트 / 해상도 변경 시 버퍼 재할당 미처리
+- LiveView 다중 클라이언트 지원(단일 프로듀서→broadcast fan-out). 해상도 변경 시 버퍼 재할당 미처리. 시청자-0 시 프로듀서 미종료(연결 중 상시 가동)
 - AF 셔터는 시간 기반(500ms) — FocusIndication(0x0707)으로 합초 확인 가능
 - ExposureProgramMode(PASM)는 A7C 물리 다이얼이라 SDK 쓰기 불가 (allowed 비어 비활성)
 - AF 좌표 보정(`AfCalib`/`af_calib(model)`)은 모델별 키화 — A7C=실측표(FocusArea=M 기준), 미측정 바디=선형 폴백. 세션 간 ~5% 변동 가능
