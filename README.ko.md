@@ -1,6 +1,6 @@
 # CRSDK Camera Server
 
-*[English README](README.md)*
+*[English README](README.md) · [日本語 README](README.ja.md)*
 
 **Sony Camera Remote SDK**의 Rust FFI 래퍼 + 브라우저 기반 **테더링 서버**(단일 페이지 웹 UI).
 폰·PC 브라우저에서 노출·포커스·촬영·라이브뷰·장노출/타임랩스를 원격 제어합니다.
