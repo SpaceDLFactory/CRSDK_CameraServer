@@ -177,7 +177,7 @@ dependencies = [
 
 [[package]]
 name = "crsdk"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "bindgen",
  "cc",
@@ -187,7 +187,7 @@ dependencies = [
 
 [[package]]
 name = "crsdk_server"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "axum",

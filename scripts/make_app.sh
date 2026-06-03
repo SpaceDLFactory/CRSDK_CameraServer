@@ -52,8 +52,14 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 </plist>
 PLIST
 
-# 서명 무효화 → ad-hoc 재서명 (install_name_tool로 깨진 서명 복구; Apple Silicon 실행 요건)
-codesign --force --sign - "$APP/Contents/MacOS/$BIN" 2>/dev/null || echo "  (codesign 생략/실패 — 실행 시 Gatekeeper 확인 필요)"
+# ad-hoc 재서명 (Apple Silicon 실행 요건). 번들 내 Sony dylib이 미서명이라 실행파일만
+# 서명하면 실패 → dylib/플러그인 먼저, 그다음 실행파일, 마지막에 번들 전체 순으로 서명.
+echo "▶ ad-hoc 코드서명"
+find "$APP/Contents/Frameworks" -name "*.dylib" -exec codesign --force --sign - {} \; 2>/dev/null || true
+codesign --force --sign - "$APP/Contents/MacOS/$BIN" 2>/dev/null || true
+codesign --force --sign - "$APP" 2>/dev/null \
+  && codesign --verify "$APP" 2>/dev/null && echo "  서명 검증 OK" \
+  || echo "  (codesign 실패 — 실행 시 우클릭→열기 또는 quarantine 해제 필요)"
 
 find "$APP" -name .DS_Store -delete 2>/dev/null || true
 
