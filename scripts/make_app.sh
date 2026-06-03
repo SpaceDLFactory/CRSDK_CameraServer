@@ -26,6 +26,9 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Frameworks" "$APP/Contents/Resourc
 cp "target/release/$BIN" "$APP/Contents/MacOS/$BIN"
 # UI (Resources/web → web_dir()가 ../Resources/web 로 탐색)
 cp -R crsdk_server/web "$APP/Contents/Resources/web"
+# 앱 아이콘 (달 사진 기반; 없으면 생성)
+[ -f assets/AppIcon.icns ] || ./scripts/make_icon.sh
+cp assets/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 # SDK 라이브러리 (Frameworks)
 cp "$SDK_LIB"/libCr_Core.dylib "$SDK_LIB"/libmonitor_protocol*.dylib "$APP/Contents/Frameworks/"
 cp -R "$SDK_LIB/CrAdapter" "$APP/Contents/Frameworks/CrAdapter"   # libCr_Core가 bundlePath/Contents/Frameworks/CrAdapter 에서 로드
@@ -49,6 +52,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundleShortVersionString</key> <string>$VERSION</string>
   <key>CFBundlePackageType</key>     <string>APPL</string>
   <key>CFBundleExecutable</key>      <string>$BIN</string>
+  <key>CFBundleIconFile</key>        <string>AppIcon</string>
   <key>LSMinimumSystemVersion</key>  <string>12.0</string>
   <key>NSHighResolutionCapable</key> <true/>
   <!-- 에이전트 앱: Dock 아이콘/바운스 없이 백그라운드 실행(브라우저가 UI). 종료는 웹 UI의 Quit. -->
