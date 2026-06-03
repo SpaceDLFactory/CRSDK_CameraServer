@@ -293,6 +293,12 @@
   .btn.active { color: var(--accent); border-color: var(--accent); background: rgba(74,158,255,0.06); }
 
   .shutter-row { margin-top: auto; padding-top: 8px; }
+  .panel-credit {
+    text-align: center; font-size: 10px; color: var(--fg-mute);
+    padding-top: 8px; letter-spacing: 0.03em;
+  }
+  .panel-credit a { color: var(--fg-mute); text-decoration: none; }
+  .panel-credit a:hover { color: var(--fg-dim); }
   .shutter {
     width: 100%;
     height: 56px;
@@ -479,6 +485,11 @@
       <button class="shutter" type="button">CAPTURE</button>
       <button class="rec-btn" id="recBtn" type="button">● REC</button>
       <button class="cancel-btn" id="cancelBtn" type="button">촬영 취소</button>
+    </div>
+
+    <div class="panel-credit">
+      © 2026 SpaceDLFactory (Kangsan Kim) · MIT ·
+      <a href="mailto:spacedlfactory@gmail.com">spacedlfactory@gmail.com</a>
     </div>
 
   </div>
