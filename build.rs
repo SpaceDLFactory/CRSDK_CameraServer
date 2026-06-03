@@ -93,6 +93,7 @@ fn main() {
         .allowlist_function("camera_get_name_size")
         .allowlist_function("camera_get_model_ptr")
         .allowlist_function("camera_get_model_size")
+        .allowlist_function("camera_get_connection_type_name_ptr")
         .allowlist_function("camera_get_usb_pid")
         .allowlist_function("camera_get_connection_status")
         .allowlist_function("camera_get_ssh_support")

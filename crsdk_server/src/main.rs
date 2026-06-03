@@ -277,6 +277,33 @@ struct ControlInfoDto {
 
 /// 디버그: 카메라가 실제로 보고하는 모든 property code 목록 + 일부 메타.
 /// 어떤 속성이 있는지 한눈에 보고 빠진 게 카메라 한계인지 판별용.
+/// 네트워크 발견 진단 — EnumCameraObjects가 찾는 모든 카메라를 연결타입/ssh와 함께 덤프.
+/// (A7C를 Wi-Fi PC Remote 모드로 두고 같은 네트워크에서 호출해 WiFi 발견 가능 여부 확인용.)
+async fn debug_enum() -> Response {
+    match tokio::task::spawn_blocking(|| {
+        let session = sdk_session();
+        let cams = CameraEnumerator::new(session, 5).map_err(|e| format!("enumerate: {e:?}"))?;
+        cams.list_all().map_err(|e| format!("list: {e:?}"))
+    })
+    .await
+    {
+        Ok(Ok(list)) => Json(serde_json::json!({
+            "count": list.len(),
+            "cameras": list.iter().map(|c| serde_json::json!({
+                "name": c.name,
+                "model": c.model,
+                "usb_pid": format!("0x{:04X}", c.usb_pid),
+                "connection_status": c.connection_status,
+                "ssh_support": c.ssh_support,
+                "connection_type": c.connection_type,
+            })).collect::<Vec<_>>(),
+        }))
+        .into_response(),
+        Ok(Err(e)) => (StatusCode::INTERNAL_SERVER_ERROR, e).into_response(),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, format!("task: {e}")).into_response(),
+    }
+}
+
 async fn debug_all_codes(State(s): State<AppState>) -> Response {
     let handle = {
         let g = s.camera.lock().await;
@@ -1148,6 +1175,7 @@ async fn main() {
         .route("/api/focus_nearfar/info", get(focus_nearfar_info))
         .route("/api/capabilities", get(capabilities))
         .route("/api/_debug/codes", get(debug_all_codes))
+        .route("/api/_debug/enum", get(debug_enum))
         .route("/events", get(events))
         .route("/lv", get(liveview))
         .nest_service("/web", ServeDir::new(web_dir()))

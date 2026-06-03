@@ -219,6 +219,14 @@ uint32_t camera_get_ssh_support(const void* cam_ptr)
     return c ? c->GetSSHsupport() : 0u;
 }
 
+// 연결 타입명 문자열 (예: "USB", "ETHERNET"). 네트워크 발견 진단용.
+const char* camera_get_connection_type_name_ptr(const void* cam_ptr)
+{
+    const auto* c =
+        static_cast<const ICrCameraObjectInfo*>(cam_ptr);
+    return c ? reinterpret_cast<const char*>(c->GetConnectionTypeName()) : nullptr;
+}
+
 uint32_t camera_get_fingerprint(const void* cam_ptr, char* buf, uint32_t buf_size)
 {
     auto* cam = static_cast<ICrCameraObjectInfo*>(

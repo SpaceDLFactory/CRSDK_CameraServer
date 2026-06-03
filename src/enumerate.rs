@@ -18,6 +18,8 @@ pub struct CameraInfo {
     pub connection_status: u32,
     /// true = WiFi/SSH 카메라, false = USB PTP 카메라
     pub ssh_support: bool,
+    /// 연결 타입명 (GetConnectionTypeName, 예: "USB"/"ETHERNET") — 네트워크 발견 진단용
+    pub connection_type: String,
 }
 
 /// 카메라 열거 결과 핸들.
@@ -82,8 +84,9 @@ impl CameraEnumerator {
         let usb_pid = unsafe { ffi::camera_get_usb_pid(cam) };
         let connection_status = unsafe { ffi::camera_get_connection_status(cam) };
         let ssh_support = unsafe { ffi::camera_get_ssh_support(cam) } != 0;
+        let connection_type = read_cchar(unsafe { ffi::camera_get_connection_type_name_ptr(cam) })?;
 
-        Ok(CameraInfo { name, model, usb_pid, connection_status, ssh_support })
+        Ok(CameraInfo { name, model, usb_pid, connection_status, ssh_support, connection_type })
     }
 
     /// 모든 카메라를 Vec로 수집.

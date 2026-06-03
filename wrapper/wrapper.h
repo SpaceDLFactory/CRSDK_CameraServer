@@ -79,6 +79,9 @@ uint32_t    camera_get_connection_status(const void* cam_ptr);
 /* 0 = SSH off (USB camera), 1 = SSH on (WiFi camera).
  * Maps to CrSSHsupportValue. */
 uint32_t    camera_get_ssh_support(const void* cam_ptr);
+/* Connection type name string (e.g. "USB", "ETHERNET"). For network-discovery
+ * diagnostics. Pointer owned by the enumerator; copy before it is released. */
+const char* camera_get_connection_type_name_ptr(const void* cam_ptr);
 /* Fetch SSH host-key fingerprint from the camera (network round-trip).
  * buf_size: size of caller buffer (1024 recommended).
  * Returns actual fingerprint length on success, 0 on failure/no-SSH. */
