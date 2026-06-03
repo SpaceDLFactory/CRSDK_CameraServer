@@ -335,6 +335,12 @@
     cursor: pointer;
   }
   .cancel-btn:active { transform: translateY(1px); }
+  .lang-sel {
+    margin-left: 8px; padding: 1px 4px;
+    background: var(--bg-2); color: var(--fg-dim);
+    border: 1px solid var(--line); border-radius: 4px;
+    font-family: var(--font-ui); font-size: 11px; cursor: pointer;
+  }
 </style>
 </head>
 <body>
@@ -350,6 +356,11 @@
     <div class="right">
       <span>BAT <strong id="batVal">—</strong></span>
       <span>· <span id="shotsVal">—</span> free</span>
+      <select class="lang-sel" id="langSel" title="Language">
+        <option value="en">English</option>
+        <option value="ko">한국어</option>
+        <option value="ja">日本語</option>
+      </select>
     </div>
   </div>
 
@@ -367,67 +378,67 @@
     <div class="lv-info">
       LIVE VIEW · <span class="v" id="lvRes">—</span> · <span class="v">JPEG</span>
     </div>
-    <button class="lv-zoom" id="zoomBtn" type="button" title="100% 확대 초점확인 (클릭=지점 선택)">🔍</button>
-    <button class="lv-grid" id="gridBtn" type="button" title="3분할 그리드 토글">▦</button>
-    <button class="lv-rotate" id="rotBtn" type="button" title="라이브뷰 회전">↻</button>
+    <button class="lv-zoom" id="zoomBtn" type="button" data-i18n-title="title.zoom">🔍</button>
+    <button class="lv-grid" id="gridBtn" type="button" data-i18n-title="title.grid">▦</button>
+    <button class="lv-rotate" id="rotBtn" type="button" data-i18n-title="title.rotate">↻</button>
   </div>
 
   <div class="panel">
 
     <div class="card">
-      <h3>Histogram</h3>
+      <h3 data-i18n="card.histogram">Histogram</h3>
       <canvas class="hist-canvas" id="histCanvas" width="256" height="72"></canvas>
     </div>
 
     <div class="card">
-      <h3>Exposure</h3>
+      <h3 data-i18n="card.exposure">Exposure</h3>
       <div class="row"><span class="k">ISO</span><select class="sel" id="selIso" data-code="260"></select></div>
       <div class="row"><span class="k">Shutter</span><select class="sel" id="selShutter" data-code="259"></select></div>
       <div class="row"><span class="k">Aperture</span><select class="sel" id="selAperture" data-code="256"></select></div>
       <div class="row"><span class="k">EV</span><select class="sel" id="selEv" data-code="257"></select></div>
       <div class="row"><span class="k">WB</span><select class="sel" id="selWb" data-code="264"></select></div>
       <div class="nf-slider" style="grid-template-columns:auto 1fr auto;">
-        <span class="k">색온도</span>
+        <span class="k" data-i18n="lbl.colortemp">Color temp</span>
         <input type="range" id="wbKelvin" min="2500" max="9900" step="100" value="5500" disabled>
         <span class="nf-val" id="wbKelvinVal">—</span>
       </div>
     </div>
 
     <div class="card">
-      <h3>File Format</h3>
+      <h3 data-i18n="card.fileformat">File Format</h3>
       <div class="row"><span class="k">Type</span><select class="sel" id="selFileType" data-code="262"></select></div>
       <div class="row"><span class="k">Quality</span><select class="sel" id="selJpegQuality" data-code="263"></select></div>
     </div>
 
     <div class="card">
-      <h3>Picture Profile</h3>
+      <h3 data-i18n="card.pictureprofile">Picture Profile</h3>
       <div class="row"><span class="k">PP</span><select class="sel" id="selPicProfile" data-code="426"></select></div>
     </div>
 
     <div class="card">
-      <h3>벌브 타이머</h3>
+      <h3 data-i18n="card.bulb">Bulb Timer</h3>
       <div class="row">
-        <span class="k">노출(초)</span>
+        <span class="k" data-i18n="lbl.expsec">Exposure (s)</span>
         <input class="path-in" id="bulbSec" type="number" min="1" max="900" value="30" style="width:90px;flex:0 0 auto;">
       </div>
-      <button class="btn" id="bulbBtn" type="button" style="width:100%;margin-top:6px;">노출 시작</button>
+      <button class="btn" id="bulbBtn" type="button" data-i18n="btn.bulbstart" style="width:100%;margin-top:6px;">Start</button>
       <div class="row" style="margin-top:6px;color:var(--fg-mute);font-size:10px;">
-        <span>셔터를 BULB로 바꿔 N초 노출 (Manual 모드 필요). 30초 초과 장노출용</span>
+        <span data-i18n="hint.bulb">Sets the shutter to BULB for an N-second exposure (Manual mode required). For exposures longer than 30s.</span>
       </div>
     </div>
 
     <div class="card">
-      <h3>인터벌 (타임랩스)</h3>
-      <div class="row"><span class="k">간격(초)</span><input class="path-in" id="ivSec" type="number" min="1" max="3600" value="10" style="width:90px;flex:0 0 auto;"></div>
-      <div class="row"><span class="k">장수</span><input class="path-in" id="ivCount" type="number" min="1" max="10000" value="30" style="width:90px;flex:0 0 auto;"></div>
-      <button class="btn" id="ivBtn" type="button" style="width:100%;margin-top:6px;">시작</button>
+      <h3 data-i18n="card.interval">Interval (Timelapse)</h3>
+      <div class="row"><span class="k" data-i18n="lbl.intervalsec">Interval (s)</span><input class="path-in" id="ivSec" type="number" min="1" max="3600" value="10" style="width:90px;flex:0 0 auto;"></div>
+      <div class="row"><span class="k" data-i18n="lbl.count">Count</span><input class="path-in" id="ivCount" type="number" min="1" max="10000" value="30" style="width:90px;flex:0 0 auto;"></div>
+      <button class="btn" id="ivBtn" type="button" data-i18n="btn.intervalstart" style="width:100%;margin-top:6px;">Start</button>
       <div class="row" style="margin-top:6px;color:var(--fg-mute);font-size:10px;">
-        <span>소프트웨어 인터벌. RAW는 간격 ≥10초 권장(다운로드 ~8s). 초점은 MF 권장</span>
+        <span data-i18n="hint.interval">Software interval. For RAW use interval ≥10s (download ~8s). MF recommended.</span>
       </div>
     </div>
 
     <div class="card">
-      <h3>Drive · Metering</h3>
+      <h3 data-i18n="card.drivemetering">Drive · Metering</h3>
       <div class="row"><span class="k">Drive</span><select class="sel" id="selDrive" data-code="270"></select></div>
       <div class="row"><span class="k">Metering</span><select class="sel" id="selMetering" data-code="266"></select></div>
       <div class="row"><span class="k">Flash</span><select class="sel" id="selFlash" data-code="267"></select></div>
@@ -436,7 +447,7 @@
     </div>
 
     <div class="card">
-      <h3>Focus Mode</h3>
+      <h3 data-i18n="card.focus">Focus Mode</h3>
       <div class="btn-row" id="focusRow">
         <button class="btn" type="button" data-code="265" data-val="1">MF</button>
         <button class="btn" type="button" data-code="265" data-val="2">AF-S</button>
@@ -450,41 +461,41 @@
         <span class="nf-val" id="nfVal">0</span>
       </div>
       <div class="btn-row" style="grid-template-columns:1fr 1fr;">
-        <button class="btn" id="peakBtn" type="button">피킹 OFF</button>
-        <button class="btn" id="afCenterBtn" type="button">AF 중앙</button>
+        <button class="btn" id="peakBtn" type="button" data-i18n="btn.peakoff">Peaking OFF</button>
+        <button class="btn" id="afCenterBtn" type="button" data-i18n="btn.afcenter">AF center</button>
       </div>
-      <div class="row" style="margin-top:6px;"><span class="k">AF 영역</span><select class="sel" id="afSize" data-code="275"><option value="4">플렉서블 S</option><option value="5">플렉서블 M</option><option value="6">플렉서블 L</option></select></div>
-      <button class="btn" id="halfBtn" type="button" style="width:100%;margin-top:6px;">반셔터 (누르고 유지 → AF)</button>
+      <div class="row" style="margin-top:6px;"><span class="k" data-i18n="lbl.afarea">AF area</span><select class="sel" id="afSize" data-code="275"><option value="4" data-i18n="opt.flexs">Flexible S</option><option value="5" data-i18n="opt.flexm">Flexible M</option><option value="6" data-i18n="opt.flexl">Flexible L</option></select></div>
+      <button class="btn" id="halfBtn" type="button" data-i18n="btn.half" style="width:100%;margin-top:6px;">Half-press (hold → AF)</button>
       <div class="row" style="margin-top:6px;color:var(--fg-mute);font-size:10px;">
-        <span>AF 포인트: LiveView 클릭 (기본 중앙)</span>
+        <span data-i18n="hint.afpoint">AF point: click the live view (center by default)</span>
       </div>
     </div>
 
     <div class="card">
-      <h3>Save To</h3>
+      <h3 data-i18n="card.saveto">Save To</h3>
       <div class="btn-row" id="saveRow">
         <button class="btn" type="button" data-code="281" data-val="2">SD</button>
         <button class="btn" type="button" data-code="281" data-val="1">PC</button>
         <button class="btn" type="button" data-code="281" data-val="3">PC+SD</button>
       </div>
       <div class="savepath">
-        <input class="path-in" id="savePathIn" type="text" placeholder="PC 저장 폴더 경로" spellcheck="false">
+        <input class="path-in" id="savePathIn" type="text" data-i18n-ph="ph.savepath" placeholder="PC save folder path" spellcheck="false">
         <button class="btn path-apply" id="savePathApply" type="button">SET</button>
       </div>
       <div class="savepath">
-        <input class="path-in" id="prefixIn" type="text" placeholder="파일명 접두사 (예: SHOOT)" spellcheck="false">
+        <input class="path-in" id="prefixIn" type="text" data-i18n-ph="ph.prefix" placeholder="Filename prefix (e.g. SHOOT)" spellcheck="false">
       </div>
     </div>
 
     <div class="card" id="recentCard" style="display:none;">
-      <h3>Recent</h3>
+      <h3 data-i18n="card.recent">Recent</h3>
       <div class="filmstrip" id="filmstrip"></div>
     </div>
 
     <div class="shutter-row">
       <button class="shutter" type="button">CAPTURE</button>
       <button class="rec-btn" id="recBtn" type="button">● REC</button>
-      <button class="cancel-btn" id="cancelBtn" type="button">촬영 취소</button>
+      <button class="cancel-btn" id="cancelBtn" type="button" data-i18n="btn.cancel">Cancel</button>
     </div>
 
     <div class="panel-credit">
@@ -499,6 +510,72 @@
 <div class="preview-box" id="previewBox"><img id="previewImg" alt="preview"></div>
 
 <script>
+  // ── i18n: 시스템 언어 자동 감지 + 드롭다운 전환 (en/ko/ja) ──────────────
+  // 기술 공통어(ISO·Shutter·EV·MF·PC 등)는 그대로 두고, 언어별 문자열만 사전화한다.
+  const I18N = {
+    en: {
+      'lang.name':'English',
+      'title.zoom':'100% focus check (click = point)','title.grid':'Toggle grid','title.rotate':'Rotate live view',
+      'card.histogram':'Histogram','card.exposure':'Exposure','card.fileformat':'File Format','card.pictureprofile':'Picture Profile',
+      'card.bulb':'Bulb Timer','card.interval':'Interval (Timelapse)','card.drivemetering':'Drive · Metering','card.focus':'Focus Mode','card.saveto':'Save To','card.recent':'Recent',
+      'lbl.colortemp':'Color temp','lbl.expsec':'Exposure (s)','lbl.intervalsec':'Interval (s)','lbl.count':'Count','lbl.afarea':'AF area',
+      'btn.bulbstart':'Start','btn.intervalstart':'Start','btn.afcenter':'AF center','btn.half':'Half-press (hold → AF)','btn.cancel':'Cancel','btn.peakoff':'Peaking OFF','btn.peakon':'Peaking ON',
+      'opt.flexs':'Flexible S','opt.flexm':'Flexible M','opt.flexl':'Flexible L',
+      'hint.bulb':'Sets the shutter to BULB for an N-second exposure (Manual mode required). For exposures longer than 30s.',
+      'hint.interval':'Software interval. For RAW use interval ≥10s (download ~8s). MF recommended.',
+      'hint.afpoint':'AF point: click the live view (center by default)',
+      'ph.savepath':'PC save folder path','ph.prefix':'Filename prefix (e.g. SHOOT)',
+      'status.reconnect':'· click CAPTURE → retry connect',
+      'dyn.exposing':'Exposing','dyn.bulbcaptured':'● BULB CAPTURED','dyn.interval':'Interval','dyn.stop':'Stop',
+      'toast.saved':'Saved','toast.disconnected':'Camera disconnected','toast.sdkerr':'SDK error',
+    },
+    ko: {
+      'lang.name':'한국어',
+      'title.zoom':'100% 확대 초점확인 (클릭=지점 선택)','title.grid':'3분할 그리드 토글','title.rotate':'라이브뷰 회전',
+      'card.histogram':'히스토그램','card.exposure':'노출','card.fileformat':'파일 형식','card.pictureprofile':'픽처 프로파일',
+      'card.bulb':'벌브 타이머','card.interval':'인터벌 (타임랩스)','card.drivemetering':'드라이브 · 측광','card.focus':'포커스 모드','card.saveto':'저장 위치','card.recent':'최근',
+      'lbl.colortemp':'색온도','lbl.expsec':'노출(초)','lbl.intervalsec':'간격(초)','lbl.count':'장수','lbl.afarea':'AF 영역',
+      'btn.bulbstart':'노출 시작','btn.intervalstart':'시작','btn.afcenter':'AF 중앙','btn.half':'반셔터 (누르고 유지 → AF)','btn.cancel':'촬영 취소','btn.peakoff':'피킹 OFF','btn.peakon':'피킹 ON',
+      'opt.flexs':'플렉서블 S','opt.flexm':'플렉서블 M','opt.flexl':'플렉서블 L',
+      'hint.bulb':'셔터를 BULB로 바꿔 N초 노출 (Manual 모드 필요). 30초 초과 장노출용',
+      'hint.interval':'소프트웨어 인터벌. RAW는 간격 ≥10초 권장(다운로드 ~8s). 초점은 MF 권장',
+      'hint.afpoint':'AF 포인트: LiveView 클릭 (기본 중앙)',
+      'ph.savepath':'PC 저장 폴더 경로','ph.prefix':'파일명 접두사 (예: SHOOT)',
+      'status.reconnect':'· click CAPTURE → /api/connect 재시도',
+      'dyn.exposing':'노출중','dyn.bulbcaptured':'● 벌브 촬영','dyn.interval':'인터벌','dyn.stop':'정지',
+      'toast.saved':'저장됨','toast.disconnected':'카메라 연결 끊김','toast.sdkerr':'SDK 오류',
+    },
+    ja: {
+      'lang.name':'日本語',
+      'title.zoom':'100% 拡大ピント確認（クリック＝位置）','title.grid':'三分割グリッド切替','title.rotate':'ライブビュー回転',
+      'card.histogram':'ヒストグラム','card.exposure':'露出','card.fileformat':'ファイル形式','card.pictureprofile':'ピクチャープロファイル',
+      'card.bulb':'バルブタイマー','card.interval':'インターバル（タイムラプス）','card.drivemetering':'ドライブ・測光','card.focus':'フォーカスモード','card.saveto':'保存先','card.recent':'最近',
+      'lbl.colortemp':'色温度','lbl.expsec':'露出(秒)','lbl.intervalsec':'間隔(秒)','lbl.count':'枚数','lbl.afarea':'AF エリア',
+      'btn.bulbstart':'露出開始','btn.intervalstart':'開始','btn.afcenter':'AF 中央','btn.half':'半押し（長押し→AF）','btn.cancel':'撮影キャンセル','btn.peakoff':'ピーキング OFF','btn.peakon':'ピーキング ON',
+      'opt.flexs':'フレキシブル S','opt.flexm':'フレキシブル M','opt.flexl':'フレキシブル L',
+      'hint.bulb':'シャッターを BULB にして N 秒露光（Manual モード必須）。30 秒超の長秒露光用。',
+      'hint.interval':'ソフトウェアインターバル。RAW は間隔 ≥10 秒推奨（ダウンロード約 8 秒）。ピントは MF 推奨。',
+      'hint.afpoint':'AF ポイント：ライブビューをクリック（既定は中央）',
+      'ph.savepath':'PC 保存フォルダのパス','ph.prefix':'ファイル名プレフィックス（例: SHOOT）',
+      'status.reconnect':'· CAPTURE をクリック → 再接続',
+      'dyn.exposing':'露出中','dyn.bulbcaptured':'● バルブ撮影','dyn.interval':'インターバル','dyn.stop':'停止',
+      'toast.saved':'保存','toast.disconnected':'カメラ切断','toast.sdkerr':'SDK エラー',
+    },
+  };
+  let LANG = (() => {
+    const s = localStorage.getItem('lang');
+    if (s && I18N[s]) return s;
+    const n = (navigator.language || 'en').toLowerCase();
+    return n.startsWith('ko') ? 'ko' : n.startsWith('ja') ? 'ja' : 'en';
+  })();
+  const t = (k) => (I18N[LANG] && I18N[LANG][k]) ?? I18N.en[k] ?? k;
+  const applyI18n = () => {
+    document.documentElement.lang = LANG;
+    document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t(el.dataset.i18n); });
+    document.querySelectorAll('[data-i18n-ph]').forEach(el => { el.placeholder = t(el.dataset.i18nPh); });
+    document.querySelectorAll('[data-i18n-title]').forEach(el => { el.title = t(el.dataset.i18nTitle); });
+  };
+
   // ── DOM refs ────────────────────────────────────────────────────────
   const sh         = document.querySelector('.shutter');
   const dot        = document.querySelector('.topbar .dot');
@@ -580,7 +657,7 @@
       topLeft.innerHTML =
         `<span class="dot" style="background:#ef4444"></span>` +
         `<span><strong>DISCONNECTED</strong></span>` +
-        `<span>· click CAPTURE → /api/connect 재시도</span>`;
+        `<span>${t('status.reconnect')}</span>`;
       stopLiveView();
       capsApplied = false;   // 재연결(다른 바디 가능) 시 다시 큐레이션
     }
@@ -683,11 +760,11 @@
     const tick = () => {
       if (left <= 0) {
         clearInterval(bulbTimer); bulbTimer = null;
-        bulbBtn.disabled = false; bulbBtn.textContent = '노출 시작';
-        flashShutter('● BULB CAPTURED');
+        bulbBtn.disabled = false; bulbBtn.textContent = t('btn.bulbstart');
+        flashShutter(t('dyn.bulbcaptured'));
         return;
       }
-      bulbBtn.textContent = `노출중… ${left}s`;
+      bulbBtn.textContent = `${t('dyn.exposing')}… ${left}s`;
       left--;
     };
     tick();
@@ -703,7 +780,7 @@
     if (ivTimer) clearInterval(ivTimer);
     ivTimer = null;
     ivSec.disabled = ivCount.disabled = false;
-    ivBtn.textContent = '시작';
+    ivBtn.textContent = t('btn.intervalstart');
   };
   ivBtn.addEventListener('click', async () => {
     if (ivTimer) {                                  // 진행중 → 정지
@@ -724,8 +801,8 @@
     ivSec.disabled = ivCount.disabled = true;
     const tick = () => {                             // 서버 타이밍 추정 진행표시
       ivShot++;
-      flashShutter(`● 인터벌 ${ivShot}/${ivTotal}`);
-      ivBtn.textContent = `정지 (${ivShot}/${ivTotal})`;
+      flashShutter(`● ${t('dyn.interval')} ${ivShot}/${ivTotal}`);
+      ivBtn.textContent = `${t('dyn.stop')} (${ivShot}/${ivTotal})`;
       if (ivShot >= ivTotal) ivStopUI();
     };
     tick();                                          // 첫 샷 즉시
@@ -749,35 +826,49 @@
   const wbKelvin         = document.getElementById('wbKelvin');
   const wbKelvinVal      = document.getElementById('wbKelvinVal');
 
-  const STYPE = {1:'자동', 2:'기계', 3:'전자'};
-  const SILENT = {1:'Off', 2:'On'};
-  const JPEGQ = {1:'Light', 2:'표준', 3:'Fine', 4:'X.Fine'};
+  // 카메라 값 라벨 — 언어별. L(map)이 현재 LANG의 맵을 고른다(없으면 en 폴백).
+  const L = (m) => m[LANG] || m.en;
+  const SILENT = {1:'Off', 2:'On'};                                    // 만국 공통
   const PPROFILE = {0:'Off', 1:'PP1', 2:'PP2', 3:'PP3', 4:'PP4', 5:'PP5', 6:'PP6',
     7:'PP7', 8:'PP8', 9:'PP9', 10:'PP10', 11:'PP11',
-    0x41:'LUT1', 0x42:'LUT2', 0x43:'LUT3', 0x44:'LUT4'};
-
-  const WB = {0x0000:'AWB',0x0001:'수중오토',0x0011:'주광',0x0012:'그늘',0x0013:'흐림',
-    0x0014:'백열등',0x0020:'형광',0x0021:'형광-온백색',0x0022:'형광-냉백색',
-    0x0023:'형광-주백색',0x0024:'형광-주광',0x0030:'플래시',0x0100:'색온도/필터',
-    0x0101:'커스텀1',0x0102:'커스텀2',0x0103:'커스텀3',0x0104:'커스텀'};
-  const DRIVE = {1:'단발',0x10001:'연속Hi',0x10002:'연속Hi+',0x10003:'연속Hi-L',
-    0x10004:'연속Lo',0x10005:'연속',0x10006:'연속(속도)',0x10007:'연속Mid',
-    0x10008:'연속Mid-L',0x10009:'연속Lo-L',
-    0x11001:'버스트Lo',0x11002:'버스트Mid',0x11003:'버스트Hi',
-    0x12001:'포커스브라켓',0x20001:'타임랩스',
-    0x30001:'타이머2s',0x30002:'타이머5s',0x30003:'타이머10s',
-    0x60001:'WB브라켓Lo',0x60002:'WB브라켓Hi',0x70001:'DRO브라켓Lo',0x70002:'DRO브라켓Hi'};
-  const METER = {1:'평균',2:'중앙중점평균',3:'멀티스팟',4:'중앙스팟',5:'멀티',6:'중앙중점',
-    7:'전체화면평균',8:'스팟(표준)',9:'스팟(대)',0xA:'하이라이트중점',0xB:'표준',0xC:'역광',0xD:'스포트라이트'};
-  // CrFocusArea (0x0113). Tracking 계열은 트래킹: 접두.
-  const FAREA = {1:'와이드',2:'존',3:'중앙',4:'플렉서블 S',5:'플렉서블 M',6:'플렉서블 L',
-    7:'확장 플렉서블',8:'플렉서블',0x11:'트래킹:와이드',0x12:'트래킹:존',0x13:'트래킹:중앙',
-    0x14:'트래킹:플렉서블 S',0x15:'트래킹:플렉서블 M',0x16:'트래킹:플렉서블 L',
-    0x17:'트래킹:확장 플렉서블',0x18:'트래킹:플렉서블',0x19:'플렉서블 XS',0x1A:'플렉서블 XL'};
+    0x41:'LUT1', 0x42:'LUT2', 0x43:'LUT3', 0x44:'LUT4'};               // 만국 공통
+  const FILETYPE = {0:'—',1:'JPEG',2:'RAW',3:'RAW+JPEG',4:'RAW+HEIF',5:'HEIF'}; // 공통
+  const STYPE = {
+    en:{1:'Auto',2:'Mechanical',3:'Electronic'}, ko:{1:'자동',2:'기계',3:'전자'}, ja:{1:'オート',2:'メカニカル',3:'電子'}};
+  const JPEGQ = {
+    en:{1:'Light',2:'Standard',3:'Fine',4:'X.Fine'}, ko:{1:'Light',2:'표준',3:'Fine',4:'X.Fine'}, ja:{1:'Light',2:'スタンダード',3:'Fine',4:'X.Fine'}};
+  const FLASH = {
+    en:{1:'Auto',2:'Off',3:'Fill-flash',4:'External Sync',5:'Slow Sync',6:'Rear Sync'},
+    ko:{1:'자동',2:'끔',3:'강제발광',4:'외부동조',5:'슬로우싱크',6:'후막싱크'},
+    ja:{1:'オート',2:'発光禁止',3:'強制発光',4:'外部同調',5:'スローシンクロ',6:'後幕シンクロ'}};
+  const WB = {
+    en:{0x0000:'AWB',0x0001:'Underwater Auto',0x0011:'Daylight',0x0012:'Shade',0x0013:'Cloudy',0x0014:'Incandescent',0x0020:'Fluorescent',0x0021:'Fluor: Warm White',0x0022:'Fluor: Cool White',0x0023:'Fluor: Day White',0x0024:'Fluor: Daylight',0x0030:'Flash',0x0100:'Color Temp/Filter',0x0101:'Custom 1',0x0102:'Custom 2',0x0103:'Custom 3',0x0104:'Custom'},
+    ko:{0x0000:'AWB',0x0001:'수중오토',0x0011:'주광',0x0012:'그늘',0x0013:'흐림',0x0014:'백열등',0x0020:'형광',0x0021:'형광-온백색',0x0022:'형광-냉백색',0x0023:'형광-주백색',0x0024:'형광-주광',0x0030:'플래시',0x0100:'색온도/필터',0x0101:'커스텀1',0x0102:'커스텀2',0x0103:'커스텀3',0x0104:'커스텀'},
+    ja:{0x0000:'AWB',0x0001:'水中オート',0x0011:'太陽光',0x0012:'日陰',0x0013:'曇り',0x0014:'電球',0x0020:'蛍光灯',0x0021:'蛍光灯:温白色',0x0022:'蛍光灯:白色',0x0023:'蛍光灯:昼白色',0x0024:'蛍光灯:昼光色',0x0030:'フラッシュ',0x0100:'色温度/フィルター',0x0101:'カスタム1',0x0102:'カスタム2',0x0103:'カスタム3',0x0104:'カスタム'}};
+  const DRIVE = {
+    en:{1:'Single',0x10001:'Cont. Hi',0x10002:'Cont. Hi+',0x10003:'Cont. Hi-L',0x10004:'Cont. Lo',0x10005:'Continuous',0x10006:'Cont. (speed)',0x10007:'Cont. Mid',0x10008:'Cont. Mid-L',0x10009:'Cont. Lo-L',0x11001:'Burst Lo',0x11002:'Burst Mid',0x11003:'Burst Hi',0x12001:'Focus Bracket',0x20001:'Timelapse',0x30001:'Timer 2s',0x30002:'Timer 5s',0x30003:'Timer 10s',0x60001:'WB Bracket Lo',0x60002:'WB Bracket Hi',0x70001:'DRO Bracket Lo',0x70002:'DRO Bracket Hi'},
+    ko:{1:'단발',0x10001:'연속Hi',0x10002:'연속Hi+',0x10003:'연속Hi-L',0x10004:'연속Lo',0x10005:'연속',0x10006:'연속(속도)',0x10007:'연속Mid',0x10008:'연속Mid-L',0x10009:'연속Lo-L',0x11001:'버스트Lo',0x11002:'버스트Mid',0x11003:'버스트Hi',0x12001:'포커스브라켓',0x20001:'타임랩스',0x30001:'타이머2s',0x30002:'타이머5s',0x30003:'타이머10s',0x60001:'WB브라켓Lo',0x60002:'WB브라켓Hi',0x70001:'DRO브라켓Lo',0x70002:'DRO브라켓Hi'},
+    ja:{1:'1枚',0x10001:'連続Hi',0x10002:'連続Hi+',0x10003:'連続Hi-L',0x10004:'連続Lo',0x10005:'連続',0x10006:'連続(速度)',0x10007:'連続Mid',0x10008:'連続Mid-L',0x10009:'連続Lo-L',0x11001:'バーストLo',0x11002:'バーストMid',0x11003:'バーストHi',0x12001:'フォーカスブラケット',0x20001:'タイムラプス',0x30001:'セルフ2秒',0x30002:'セルフ5秒',0x30003:'セルフ10秒',0x60001:'WBブラケットLo',0x60002:'WBブラケットHi',0x70001:'DROブラケットLo',0x70002:'DROブラケットHi'}};
+  const METER = {
+    en:{1:'Average',2:'Center-weighted Avg',3:'Multi Spot',4:'Center Spot',5:'Multi',6:'Center-weighted',7:'Entire Screen Avg',8:'Spot (Std)',9:'Spot (L)',0xA:'Highlight',0xB:'Standard',0xC:'Backlight',0xD:'Spotlight'},
+    ko:{1:'평균',2:'중앙중점평균',3:'멀티스팟',4:'중앙스팟',5:'멀티',6:'중앙중점',7:'전체화면평균',8:'스팟(표준)',9:'스팟(대)',0xA:'하이라이트중점',0xB:'표준',0xC:'역광',0xD:'스포트라이트'},
+    ja:{1:'平均',2:'中央重点平均',3:'マルチスポット',4:'中央スポット',5:'マルチ',6:'中央重点',7:'画面全体平均',8:'スポット(標準)',9:'スポット(大)',0xA:'ハイライト重点',0xB:'標準',0xC:'逆光',0xD:'スポットライト'}};
+  // CrFocusArea (0x0113). Tracking 계열은 접두.
+  const FAREA = {
+    en:{1:'Wide',2:'Zone',3:'Center',4:'Flexible S',5:'Flexible M',6:'Flexible L',7:'Expand Flexible',8:'Flexible',0x11:'Tracking: Wide',0x12:'Tracking: Zone',0x13:'Tracking: Center',0x14:'Tracking: Flexible S',0x15:'Tracking: Flexible M',0x16:'Tracking: Flexible L',0x17:'Tracking: Expand Flexible',0x18:'Tracking: Flexible',0x19:'Flexible XS',0x1A:'Flexible XL'},
+    ko:{1:'와이드',2:'존',3:'중앙',4:'플렉서블 S',5:'플렉서블 M',6:'플렉서블 L',7:'확장 플렉서블',8:'플렉서블',0x11:'트래킹:와이드',0x12:'트래킹:존',0x13:'트래킹:중앙',0x14:'트래킹:플렉서블 S',0x15:'트래킹:플렉서블 M',0x16:'트래킹:플렉서블 L',0x17:'트래킹:확장 플렉서블',0x18:'트래킹:플렉서블',0x19:'플렉서블 XS',0x1A:'플렉서블 XL'},
+    ja:{1:'ワイド',2:'ゾーン',3:'中央',4:'フレキシブル S',5:'フレキシブル M',6:'フレキシブル L',7:'拡張フレキシブル',8:'フレキシブル',0x11:'トラッキング:ワイド',0x12:'トラッキング:ゾーン',0x13:'トラッキング:中央',0x14:'トラッキング:フレキシブル S',0x15:'トラッキング:フレキシブル M',0x16:'トラッキング:フレキシブル L',0x17:'トラッキング:拡張フレキシブル',0x18:'トラッキング:フレキシブル',0x19:'フレキシブル XS',0x1A:'フレキシブル XL'}};
+  // 드라이브 브라켓 폴백(상위 니블 기반) 라벨
+  const DRIVE_HI = {
+    en:{4:'Cont. Bracket',5:'Single Bracket',8:'Cont. Timer'},
+    ko:{4:'연속브라켓',5:'싱글브라켓',8:'연속타이머'},
+    ja:{4:'連続ブラケット',5:'1枚ブラケット',8:'連続セルフ'}};
+  const DRIVE_LO = {
+    en:{1:'LPF Bracket',2:'Remote',3:'Mirror-up',4:'Self 1',5:'Self 2'},
+    ko:{1:'LPF브라켓',2:'리모컨',3:'미러업',4:'셀프1',5:'셀프2'},
+    ja:{1:'LPFブラケット',2:'リモコン',3:'ミラーアップ',4:'セルフ1',5:'セルフ2'}};
   // 클릭으로 위치 지정이 먹히는 Flexible/Expand 계열만.
   const POSITIONAL_AREA = new Set([4,5,6,7,8,0x14,0x15,0x16,0x17,0x18,0x19,0x1A]);
-  // CrFlashMode (0x010B). 플래시 미장착/미지원 바디는 property 미노출 → capability가 카드 숨김.
-  const FLASH = {1:'자동',2:'끔',3:'강제발광',4:'외부동조',5:'슬로우싱크',6:'후막싱크'};
 
   // raw 값 → 라벨. 매핑/유효성 실패 시 null 반환 → fillSelect가 옵션에서 제외
   // (SDK가 allowed 배열에 끼워넣는 쓰레기값 방어).
@@ -804,25 +895,22 @@
       const e = s / 1000;
       return (e > 0 ? '+' : '') + e.toFixed(1);
     },
-    wb: v => WB[v] ?? null,
+    wb: v => L(WB)[v] ?? null,
     drive: v => {
-      if (DRIVE[v]) return DRIVE[v];
+      if (L(DRIVE)[v]) return L(DRIVE)[v];
       const hi = (v >>> 16) & 0xFFFF;
-      if (hi === 0x4) return '연속브라켓';
-      if (hi === 0x5) return '싱글브라켓';
-      if (hi === 0x8) return '연속타이머';
-      if (v >= 0x10000001 && v <= 0x10000005)
-        return {1:'LPF브라켓',2:'리모컨',3:'미러업',4:'셀프1',5:'셀프2'}[v & 0xF];
+      if (L(DRIVE_HI)[hi]) return L(DRIVE_HI)[hi];
+      if (v >= 0x10000001 && v <= 0x10000005) return L(DRIVE_LO)[v & 0xF];
       return null;
     },
-    metering: v => METER[v] ?? null,
-    stype: v => STYPE[v] ?? null,
+    metering: v => L(METER)[v] ?? null,
+    stype: v => L(STYPE)[v] ?? null,
     silent: v => SILENT[v] ?? null,
-    filetype: v => ({0:'—',1:'JPEG',2:'RAW',3:'RAW+JPEG',4:'RAW+HEIF',5:'HEIF'}[v] ?? null),
-    jpegq: v => JPEGQ[v] ?? null,
+    filetype: v => FILETYPE[v] ?? null,
+    jpegq: v => L(JPEGQ)[v] ?? null,
     pprofile: v => PPROFILE[v] ?? null,
-    farea: v => FAREA[v] ?? null,
-    flash: v => FLASH[v] ?? null,
+    farea: v => L(FAREA)[v] ?? null,
+    flash: v => L(FLASH)[v] ?? null,
   };
 
   // allowed[]에서 디코딩 가능한 값만 <option>으로. 0 패딩·중복·SDK 쓰레기 제외.
@@ -1059,7 +1147,7 @@
     switch (ev.type) {
       case 'download_complete': {
         const name = (ev.filename || '').split('/').pop();
-        toast(`저장됨: ${name}`, 'ok');
+        toast(`${t('toast.saved')}: ${name}`, 'ok');
         showPreview();      // 방금 저장된 이미지 미리보기
         addToFilmstrip();   // 최근 썸네일 누적
         break;
@@ -1068,11 +1156,11 @@
         pollProperties();        // 다이얼 변경 즉시 반영 (2초 폴링 대기 없이)
         break;
       case 'disconnected':
-        toast('카메라 연결 끊김', 'err');
+        toast(t('toast.disconnected'), 'err');
         pollStatus();
         break;
       case 'error':
-        toast(`SDK 오류 0x${(ev.code >>> 0).toString(16)}`, 'err');
+        toast(`${t('toast.sdkerr')} 0x${(ev.code >>> 0).toString(16)}`, 'err');
         break;
       // warning / lv_property_changed 등은 조용히 무시
     }
@@ -1162,7 +1250,7 @@
   peakBtn.addEventListener('click', () => {
     peaking = !peaking;
     peakBtn.classList.toggle('active', peaking);
-    peakBtn.textContent = peaking ? '피킹 ON' : '피킹 OFF';
+    peakBtn.textContent = t(peaking ? 'btn.peakon' : 'btn.peakoff');
     peakCanvas.classList.toggle('on', peaking);
     if (peaking) requestAnimationFrame(peakLoop);
     else pctx.clearRect(0, 0, peakCanvas.width, peakCanvas.height);
@@ -1324,6 +1412,19 @@
     hctx.globalCompositeOperation = 'source-over';
   };
   setInterval(drawHist, 120);                       // ~8fps
+
+  // ── 언어 선택 (시스템 언어 자동 + 드롭다운 전환) ──────────────────────
+  const langSel = document.getElementById('langSel');
+  langSel.value = LANG;
+  const setLang = (l) => {
+    if (!I18N[l]) return;
+    LANG = l; localStorage.setItem('lang', l);
+    applyI18n();
+    peakBtn.textContent = t(peaking ? 'btn.peakon' : 'btn.peakoff'); // 동적 라벨 보정
+    pollProperties();                               // 드롭다운(WB/Drive/…) 라벨 갱신
+  };
+  langSel.addEventListener('change', () => setLang(langSel.value));
+  applyI18n();                                       // 초기 적용(시스템 언어/저장값)
 </script>
 </body>
 </html>

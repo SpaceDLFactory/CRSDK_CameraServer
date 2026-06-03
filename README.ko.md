@@ -28,7 +28,7 @@
 단일 페이지 **Tether Console** — 왼쪽은 포커스 피킹·3분할 그리드가 얹힌 라이브뷰,
 오른쪽은 모든 컨트롤.
 
-| 연결됨 | 라이브뷰 (AF) |
+| 연결됨 | 라이브뷰 (MF 초점 이동) |
 |---|---|
 | ![연결 UI](gallery/ui-connected.png) | ![라이브뷰](gallery/ui-liveview.png) |
 

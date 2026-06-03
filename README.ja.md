@@ -38,7 +38,7 @@
 シングルページの **Tether Console** — 左にフォーカスピーキングと三分割グリッド付きの
 ライブビュー、右にすべてのコントロール。
 
-| 接続中 | ライブビュー (AF) |
+| 接続中 | ライブビュー（MF ピント送り） |
 |---|---|
 | ![connected UI](gallery/ui-connected.png) | ![live view](gallery/ui-liveview.png) |
 

@@ -38,7 +38,7 @@ live view, and long-exposure/timelapse from any browser on your phone or PC.
 The single-page **Tether Console** — live view with focus peaking and a rule-of-thirds
 grid on the left, all controls on the right.
 
-| Connected | Live view (AF) |
+| Connected | Live view (MF focus pull) |
 |---|---|
 | ![connected UI](gallery/ui-connected.png) | ![live view](gallery/ui-liveview.png) |
 
