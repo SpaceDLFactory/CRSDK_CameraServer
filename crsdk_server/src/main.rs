@@ -1157,6 +1157,16 @@ async fn main() {
         .await
         .expect("bind 0.0.0.0:8080");
     tracing::info!("crsdk_server listening on http://0.0.0.0:8080");
+
+    // 실행 시 기본 브라우저로 UI를 띄운다(.app 더블클릭 UX). 개발/테스트 중 매 재시작마다
+    // 탭이 열리는 걸 막으려면 CRSDK_NO_BROWSER=1.
+    #[cfg(target_os = "macos")]
+    if std::env::var_os("CRSDK_NO_BROWSER").is_none() {
+        let _ = std::process::Command::new("open")
+            .arg("http://localhost:8080/web/index.html")
+            .spawn();
+    }
+
     axum::serve(listener, app)
         .with_graceful_shutdown(shutdown_signal(shutdown_state))
         .await
