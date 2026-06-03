@@ -1109,6 +1109,23 @@ fn web_dir() -> std::path::PathBuf {
     std::path::PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/web"))
 }
 
+/// 맥의 LAN IPv4 (폰 접속용). UDP connect 트릭 — 실제 패킷은 보내지 않고
+/// OS가 외부로 나갈 때 쓰는 인터페이스 주소를 읽는다. 오프라인/경로 없음이면 None.
+fn lan_ip() -> Option<String> {
+    let sock = std::net::UdpSocket::bind("0.0.0.0:0").ok()?;
+    sock.connect("8.8.8.8:80").ok()?;
+    sock.local_addr().ok().map(|a| a.ip().to_string())
+}
+
+/// 서버 정보 — 버전 + 폰 접속 URL(LAN). UI가 폰 접속 안내에 사용.
+async fn server_info() -> Json<serde_json::Value> {
+    let lan = lan_ip().map(|ip| format!("http://{ip}:8080/web/index.html"));
+    Json(serde_json::json!({
+        "version": env!("CARGO_PKG_VERSION"),
+        "lan_url": lan,
+    }))
+}
+
 /// 자기 자신을 제외한, 같은 이름(crsdk_server)의 실행 중 인스턴스 PID들.
 fn other_instance_pids() -> Vec<u32> {
     let me = std::process::id();
@@ -1197,6 +1214,7 @@ async fn main() {
     let app = Router::new()
         .route("/", get(root))
         .route("/api/status", get(status))
+        .route("/api/serverinfo", get(server_info))
         .route("/api/connect", post(connect))
         .route("/api/disconnect", post(disconnect))
         .route("/api/shutter", post(shutter))
@@ -1231,6 +1249,10 @@ async fn main() {
         .await
         .expect("bind 0.0.0.0:8080");
     tracing::info!("crsdk_server listening on http://0.0.0.0:8080");
+    tracing::info!("  on this Mac : http://localhost:8080/web/index.html");
+    if let Some(ip) = lan_ip() {
+        tracing::info!("  on a phone  : http://{ip}:8080/web/index.html  (same Wi-Fi)");
+    }
 
     // 실행 시 기본 브라우저로 UI를 띄운다(.app 더블클릭 UX). 개발/테스트 중 매 재시작마다
     // 탭이 열리는 걸 막으려면 CRSDK_NO_BROWSER=1.
