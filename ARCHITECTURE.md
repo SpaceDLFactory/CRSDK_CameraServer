@@ -26,7 +26,9 @@ crsdk_rust_wrapper/                  (Cargo workspace)
 │   ├── connection.rs     Camera (RAII Drop 체인, take_events, set_save_info)
 │   ├── liveview.rs       LiveViewStream — JPEG 프레임 fetch
 │   ├── shutter.rs        capture (MF) / capture_af (AF S1 시퀀스)
-│   └── properties.rs     get/set + 속성 코드·값 상수
+│   ├── control.rs        제어코드(Range 파싱) 접근
+│   ├── properties.rs     get/set + 속성 코드·값 상수 (Array·Range allowed)
+│   └── capability.rs     Capabilities{model, supported} + probe + has (바디 능력)
 ├── wrapper/wrapper.{h,cpp}          C++ SDK → 순수 C ABI shim
 ├── build.rs                         cc(libwrapper.a) + bindgen + CrAdapter symlink + rpath
 └── crsdk_server/                    ── axum HTTP/SSE 서버 (bin) ──
@@ -48,15 +50,22 @@ Sony C++ SDK (네임스페이스·vtable)
 
 ```rust
 AppState {
-    camera:    Arc<tokio::Mutex<Option<CameraCell>>>,  // CameraCell = unsafe Send newtype
-    save_path: Arc<tokio::Mutex<String>>,
-    events_tx: broadcast::Sender<String>,              // JSON 직렬화 이벤트 fan-out
+    camera:     Arc<tokio::Mutex<Option<CameraCell>>>, // CameraCell = unsafe Send newtype
+    save_path:  Arc<tokio::Mutex<String>>,
+    events_tx:  broadcast::Sender<String>,             // JSON 직렬화 이벤트 fan-out
+    last_image: Arc<Mutex<Option<String>>>,            // 마지막 PC 저장(미리보기)
+    bulb_active, interval_active: Arc<AtomicBool>,      // 소프트 벌브/인터벌 진행 플래그
+    lv_tx:      broadcast::Sender<Arc<Vec<u8>>>,        // LiveView 프레임 fan-out(다중 클라)
+    lv_running: Arc<std::sync::Mutex<bool>>,            // LiveView 단일 프로듀서 보장 락
 }
 ```
 
 - **세션 'static화**: `OnceLock<SdkSession>` → `Camera<'static>`
 - **SDK는 동기(blocking)** → 모든 SDK 호출은 `spawn_blocking`으로 격리 (tokio 워커 보호)
 - **락 규칙**: `.await` 전에 handle만 꺼내고 락 해제 → 블로킹 작업 중 락 미보유
+- **LiveView fan-out**: 카메라당 단일 프로듀서가 `lv_tx`로 broadcast → 각 `/lv`는 구독만
+- **Graceful shutdown**: SIGTERM/SIGINT → 카메라 Drop 수동 실행 후, 스트리밍 연결이
+  드레인 안 되므로 2s 유예 뒤 워치독이 `process::exit`(좀비 방지)
 
 ## 5. HTTP/SSE 엔드포인트
 
@@ -70,7 +79,7 @@ AppState {
 | POST | `/api/shutter` | focus mode 감지 → MF: capture / AF: capture_af |
 | POST | `/api/savepath` `{path}` | 저장 폴더 변경 |
 | GET | `/events` (SSE) | DownloadComplete·PropertyChanged·Disconnected·Error |
-| GET | `/lv` (MJPEG) | LiveView 영상 스트림 |
+| GET | `/lv` (MJPEG) | LiveView 영상 스트림 (단일 프로듀서→broadcast, 다중 클라이언트) |
 | GET | `/web/*` | 정적 UI |
 
 ## 6. 핵심 데이터 흐름

@@ -10,6 +10,7 @@ cd "$(dirname "$0")/.."
 SDK_LIB="CrSDK_v2.01.00_20260203a_Mac/RemoteCli/external/crsdk"
 APP="dist/A7C Tether.app"
 BIN="crsdk_server"
+VERSION="$(grep '^version' crsdk_server/Cargo.toml | head -1 | cut -d'"' -f2)"  # Cargo에서 버전 일원화
 
 [ -d "$SDK_LIB" ] || { echo "✗ SDK 없음: $SDK_LIB"; exit 1; }
 
@@ -41,8 +42,8 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundleName</key>            <string>A7C Tether</string>
   <key>CFBundleDisplayName</key>     <string>A7C Tether</string>
   <key>CFBundleIdentifier</key>      <string>film.neko.a7ctether</string>
-  <key>CFBundleVersion</key>         <string>0.1.0</string>
-  <key>CFBundleShortVersionString</key> <string>0.1.0</string>
+  <key>CFBundleVersion</key>         <string>$VERSION</string>
+  <key>CFBundleShortVersionString</key> <string>$VERSION</string>
   <key>CFBundlePackageType</key>     <string>APPL</string>
   <key>CFBundleExecutable</key>      <string>$BIN</string>
   <key>LSMinimumSystemVersion</key>  <string>12.0</string>

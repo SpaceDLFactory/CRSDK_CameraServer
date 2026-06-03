@@ -28,7 +28,10 @@ live view, and long-exposure/timelapse from any browser on your phone or PC.
 - **Save** — to PC with custom folder/prefix, capture preview, battery & shots-remaining
 - **Multi-body ready** — controls are curated from each body's reported
   capabilities; properties a body does not expose are hidden automatically
-- **Robust** — auto-reconnect, graceful shutdown (clean camera session release)
+- **Multiple viewers** — the live view fans out to any number of browsers
+  (phone + desktop at once) from a single camera stream
+- **Robust** — auto-reconnect, graceful shutdown (clean camera session release),
+  opens your browser automatically on launch
 
 ## Screenshots
 
