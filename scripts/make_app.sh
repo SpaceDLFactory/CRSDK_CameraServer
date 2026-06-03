@@ -51,6 +51,8 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundleExecutable</key>      <string>$BIN</string>
   <key>LSMinimumSystemVersion</key>  <string>12.0</string>
   <key>NSHighResolutionCapable</key> <true/>
+  <!-- 에이전트 앱: Dock 아이콘/바운스 없이 백그라운드 실행(브라우저가 UI). 종료는 웹 UI의 Quit. -->
+  <key>LSUIElement</key>             <true/>
 </dict>
 </plist>
 PLIST

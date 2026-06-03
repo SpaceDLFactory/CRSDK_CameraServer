@@ -1126,6 +1126,18 @@ async fn server_info() -> Json<serde_json::Value> {
     }))
 }
 
+/// 웹 UI에서 서버 종료 (LSUIElement 에이전트 앱이라 Dock으로 종료 불가 → Quit 버튼용).
+/// 카메라를 먼저 해제(Drop)한 뒤 잠시 후 프로세스 종료.
+async fn quit(State(s): State<AppState>) -> impl IntoResponse {
+    tracing::info!("quit requested via API");
+    *s.camera.lock().await = None; // Camera Drop(disconnect/release) 동기 실행
+    tokio::spawn(async {
+        tokio::time::sleep(Duration::from_millis(300)).await;
+        std::process::exit(0);
+    });
+    "bye"
+}
+
 /// 자기 자신을 제외한, 같은 이름(crsdk_server)의 실행 중 인스턴스 PID들.
 fn other_instance_pids() -> Vec<u32> {
     let me = std::process::id();
@@ -1215,6 +1227,7 @@ async fn main() {
         .route("/", get(root))
         .route("/api/status", get(status))
         .route("/api/serverinfo", get(server_info))
+        .route("/api/quit", post(quit))
         .route("/api/connect", post(connect))
         .route("/api/disconnect", post(disconnect))
         .route("/api/shutter", post(shutter))

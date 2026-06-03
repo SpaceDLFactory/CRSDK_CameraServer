@@ -367,6 +367,7 @@
         <option value="ko">한국어</option>
         <option value="ja">日本語</option>
       </select>
+      <button class="lang-sel" id="quitBtn" type="button" data-i18n="btn.quit" title="Quit server">Quit</button>
     </div>
   </div>
 
@@ -526,6 +527,7 @@
   const I18N = {
     en: {
       'lang.name':'English','phone.label':'On your phone (same Wi-Fi):',
+      'btn.quit':'Quit','dyn.stopped':'Server stopped. You can close this tab.',
       'title.zoom':'100% focus check (click = point)','title.grid':'Toggle grid','title.rotate':'Rotate live view',
       'card.histogram':'Histogram','card.exposure':'Exposure','card.fileformat':'File Format','card.pictureprofile':'Picture Profile',
       'card.bulb':'Bulb Timer','card.interval':'Interval (Timelapse)','card.drivemetering':'Drive · Metering','card.focus':'Focus Mode','card.saveto':'Save To','card.recent':'Recent',
@@ -542,6 +544,7 @@
     },
     ko: {
       'lang.name':'한국어','phone.label':'폰에서 (같은 Wi-Fi):',
+      'btn.quit':'종료','dyn.stopped':'서버를 종료했습니다. 이 탭을 닫아도 됩니다.',
       'title.zoom':'100% 확대 초점확인 (클릭=지점 선택)','title.grid':'3분할 그리드 토글','title.rotate':'라이브뷰 회전',
       'card.histogram':'히스토그램','card.exposure':'노출','card.fileformat':'파일 형식','card.pictureprofile':'픽처 프로파일',
       'card.bulb':'벌브 타이머','card.interval':'인터벌 (타임랩스)','card.drivemetering':'드라이브 · 측광','card.focus':'포커스 모드','card.saveto':'저장 위치','card.recent':'최근',
@@ -558,6 +561,7 @@
     },
     ja: {
       'lang.name':'日本語','phone.label':'スマホで（同じ Wi-Fi）:',
+      'btn.quit':'終了','dyn.stopped':'サーバーを終了しました。このタブを閉じてかまいません。',
       'title.zoom':'100% 拡大ピント確認（クリック＝位置）','title.grid':'三分割グリッド切替','title.rotate':'ライブビュー回転',
       'card.histogram':'ヒストグラム','card.exposure':'露出','card.fileformat':'ファイル形式','card.pictureprofile':'ピクチャープロファイル',
       'card.bulb':'バルブタイマー','card.interval':'インターバル（タイムラプス）','card.drivemetering':'ドライブ・測光','card.focus':'フォーカスモード','card.saveto':'保存先','card.recent':'最近',
@@ -1436,6 +1440,14 @@
   };
   langSel.addEventListener('change', () => setLang(langSel.value));
   applyI18n();                                       // 초기 적용(시스템 언어/저장값)
+
+  // ── 서버 종료 (에이전트 앱이라 Dock으로 못 끄므로 UI에서 종료) ──────────
+  document.getElementById('quitBtn').addEventListener('click', async () => {
+    try { await fetch('/api/quit', { method: 'POST' }); } catch (e) {}
+    document.body.innerHTML =
+      '<div style="display:flex;height:100vh;align-items:center;justify-content:center;' +
+      'color:var(--fg-dim);font-family:var(--font-ui);font-size:14px;">' + t('dyn.stopped') + '</div>';
+  });
 
   // ── 폰 접속 URL (LAN) 표시 — 같은 Wi-Fi의 폰에서 이 주소로 접속 ──────────
   fetch('/api/serverinfo', { cache: 'no-store' }).then(r => r.json()).then(d => {
