@@ -1169,7 +1169,12 @@ async fn main() {
 // 만들어 Camera::Drop을 즉시 실행시킨다. Drop 체인: deactivate_callback →
 // disconnect → release_device. 이게 없으면 카메라에 세션이 남아 재연결 시
 // CrError_Connect_FailBusy(0x820B)가 난다.
-// std::process::exit()는 Drop을 건너뛰므로 절대 호출하지 않는다.
+//
+// 주의: /lv(MJPEG)·/events(SSE)는 무한 스트리밍 연결이라 자발적으로 닫히지 않는다.
+// 따라서 with_graceful_shutdown의 연결 드레인이 영원히 끝나지 않아 프로세스가 좀비로
+// 남는다(SIGTERM에도 안 죽음 → 중복 인스턴스 → ConnectTimeout). 카메라 Drop은 아래에서
+// 수동으로 끝내므로, 짧은 유예 후 워치독이 강제 종료해 이 행을 끊는다. (이 시점엔 중요한
+// 정리가 이미 끝났으므로 process::exit가 안전하다.)
 async fn shutdown_signal(state: AppState) {
     let ctrl_c = async {
         if tokio::signal::ctrl_c().await.is_err() {
@@ -1191,5 +1196,14 @@ async fn shutdown_signal(state: AppState) {
         _ = terminate => {},
     }
     tracing::info!("shutdown signal received — disconnecting camera");
-    *state.camera.lock().await = None;
+    *state.camera.lock().await = None; // Camera Drop(disconnect/release)을 동기 실행
+
+    // 스트리밍 연결이 드레인되지 않아 graceful shutdown이 무한 대기하는 것을 방지.
+    // 카메라 정리는 위에서 끝났으니, 유예 후 강제 종료한다. 정상 연결은 그 사이 닫히고
+    // serve()가 먼저 반환하면 main 종료로 프로세스가 정상 종료(이 태스크는 함께 사라짐).
+    tokio::spawn(async {
+        tokio::time::sleep(Duration::from_secs(2)).await;
+        tracing::warn!("forcing exit — streaming connections (/lv, /events) did not drain");
+        std::process::exit(0);
+    });
 }
