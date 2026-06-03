@@ -13,6 +13,19 @@ live view, and long-exposure/timelapse from any browser on your phone or PC.
 > etc.) remain in the code but do not work on this body. Multi-body support is
 > a future goal.
 
+## Quick start — just use it
+
+No building required. Grab the latest **[release](../../releases/latest)**:
+
+1. Download the `.dmg`, open it, and drag **A7C Tether** into Applications.
+2. Launch it. First time only: right-click the app → **Open** → **Open**.
+3. Connect your A7C by USB and set it to **PC Remote** (camera: MENU → USB →
+   *USB Connection Mode* → *PC Remote*). The console opens in your browser.
+4. To watch/control from a phone, open the LAN URL shown at the bottom of the
+   page (phone must be on the same Wi-Fi).
+
+The rest of this README is for **building from source**.
+
 ## Features
 
 - **Live view** — MJPEG stream with focus peaking, RGB histogram, toggleable
