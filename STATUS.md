@@ -91,7 +91,7 @@
 - ✅ **반셔터(S1)** — 정상 동작 확인: half/down→FocusIndication 1(Unlocked)→258(Focused-AFS), half/up 후 합초 유지. 이전 "불완전"은 렌즈 MF 스위치/대상 상태 문제였음(코드 정상). FocusIndication(0x707) 계기판으로 검증
 - ℹ️ 진단 엔드포인트: `/api/_debug/level`(자이로, A7C 미지원이나 **타 바디용으로 유지** — 프로젝트가 멀티바디 지향), `/api/_debug/afframe`(AF 실위치, 동작)
 - 📌 방향: **A7C 전용 아님 → 차후 다른 카메라도 연결 예정.** A7C 미지원 기능도 코드는 유지(제거 금지), 런타임에 노출 여부로 분기
-- ⚠️ 운영 교훈: 서버 재시작 시 **중복 프로세스** 주의(둘이 카메라 물면 ConnectTimeout 0x8208). graceful shutdown으로 단일 종료는 해결됨
+- ✅ **단일 인스턴스 보장**: 실행 시 기존 `crsdk_server`를 SIGTERM(→graceful 카메라 해제)→대기→SIGKILL로 종료 후 바인딩. 일반 사용자가 .app을 여러 번 켜도 중복 인스턴스로 인한 ConnectTimeout(0x8208) 없음. 검증: 2개 동시 실행 시 후자가 전자를 종료하고 단독 listening
 - ✅ **인터벌/타임랩스** — A7C는 내장 인터벌 설정 미노출 → **소프트웨어 인터벌**(`/api/interval {interval_sec,count}` + `/stop`, 백그라운드 루프, 1초 단위 취소). 하드웨어 검증(2장 촬영, 409 중복거부, 정지/재시작). MF 권장, RAW는 간격 ≥10초
 - 🔧 **dropdown 라벨 중복 제거** — fillSelect가 같은 라벨(연속브라켓/싱글브라켓/연속타이머 등 변종)을 1개로 접음. 카메라가 보고하는 변종 도배 해소
 - 🚫 A7C 미지원 확인됨(덤프 대조): RAW압축(0x0131), Creative Look(0x01C5) — 둘 다 카메라가 property 자체를 노출 안 함. SDK에 Creative Style 대체 property 없음. ✅ WB AWB(0) 0-필터 버그 수정: `fillSelect(selWb,...,allowZero=true)`로 현재값이 AWB 아니어도 드롭다운에 노출 (벌브·PP Off와 동일 처리). 검증: 하드웨어(WB allowed에 0 포함 확인)

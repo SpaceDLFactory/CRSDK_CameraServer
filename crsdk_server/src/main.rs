@@ -1109,9 +1109,55 @@ fn web_dir() -> std::path::PathBuf {
     std::path::PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/web"))
 }
 
+/// 자기 자신을 제외한, 같은 이름(crsdk_server)의 실행 중 인스턴스 PID들.
+fn other_instance_pids() -> Vec<u32> {
+    let me = std::process::id();
+    std::process::Command::new("pgrep")
+        .args(["-x", "crsdk_server"])
+        .output()
+        .map(|o| {
+            String::from_utf8_lossy(&o.stdout)
+                .split_whitespace()
+                .filter_map(|s| s.parse::<u32>().ok())
+                .filter(|&p| p != me)
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// 실행 시 기존 인스턴스를 종료한다. 중복 인스턴스가 카메라를 두고 다투면
+/// ConnectTimeout(0x8208)이 나므로, 일반 사용자가 앱을 여러 번 켜도 단일 인스턴스가
+/// 되도록 한다. 먼저 SIGTERM(기존 인스턴스의 graceful shutdown → 카메라 해제)을 보내고,
+/// 종료를 기다린 뒤 남으면 SIGKILL.
+fn terminate_other_instances() {
+    let pids = other_instance_pids();
+    if pids.is_empty() {
+        return;
+    }
+    for p in &pids {
+        tracing::info!("existing instance pid {p} found — terminating (single-instance)");
+        let _ = std::process::Command::new("kill").arg(p.to_string()).status();
+    }
+    for _ in 0..30 {
+        std::thread::sleep(Duration::from_millis(100)); // 최대 ~3s graceful 대기
+        if other_instance_pids().is_empty() {
+            return;
+        }
+    }
+    for p in other_instance_pids() {
+        let _ = std::process::Command::new("kill").args(["-9", &p.to_string()]).status();
+    }
+    std::thread::sleep(Duration::from_millis(300)); // 포트/카메라 해제 여유
+}
+
 #[tokio::main]
 async fn main() {
     tracing_subscriber::fmt::init();
+
+    // 기존 인스턴스 종료 → 단일 인스턴스 보장(중복 시 카메라 ConnectTimeout 방지).
+    tokio::task::spawn_blocking(terminate_other_instances)
+        .await
+        .ok();
 
     // USB 간섭 억제 시작 — main 수명 동안 유지 (graceful shutdown 시 Drop이 회수)
     let _killer = UsbInterferenceSuppressor::start();
