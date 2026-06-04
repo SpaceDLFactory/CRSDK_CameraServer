@@ -1,5 +1,7 @@
 # TetherMoon 🌙
 
+![TetherMoon](gallery/sns-wide.png)
+
 *[한국어 README](README.ko.md) · [日本語 README](README.ja.md)*
 
 A Rust FFI wrapper for the **Sony Camera Remote SDK** plus a browser-based

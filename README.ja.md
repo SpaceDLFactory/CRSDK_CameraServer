@@ -1,5 +1,7 @@
 # TetherMoon 🌙
 
+![TetherMoon](gallery/sns-wide.png)
+
 *[English README](README.md) · [한국어 README](README.ko.md)*
 
 **Sony Camera Remote SDK** の Rust FFI ラッパー＋ブラウザベースの **テザリングサーバー**
