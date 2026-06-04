@@ -1,4 +1,4 @@
-# CRSDK Camera Server
+# TetherMoon 🌙
 
 *[한국어 README](README.ko.md) · [日本語 README](README.ja.md)*
 
@@ -17,7 +17,7 @@ live view, and long-exposure/timelapse from any browser on your phone or PC.
 
 No building required. Grab the latest **[release](../../releases/latest)**:
 
-1. Download the `.dmg`, open it, and drag **A7C Tether** into Applications.
+1. Download the `.dmg`, open it, and drag **TetherMoon** into Applications.
 2. Launch it. First time only: right-click the app → **Open** → **Open**.
 3. Connect your A7C by USB and set it to **PC Remote** (camera: MENU → USB →
    *USB Connection Mode* → *PC Remote*). The console opens in your browser.
@@ -88,14 +88,14 @@ it on startup (this is expected behavior).
 
 The Sony license permits distributing the SDK library **embedded inside your
 application**. `scripts/make_app.sh` packages a self-contained macOS app bundle
-(`dist/A7C Tether.app`) with the SDK libraries inside `Contents/Frameworks/`:
+(`dist/TetherMoon.app`) with the SDK libraries inside `Contents/Frameworks/`:
 
 ```bash
 ./scripts/make_app.sh
 ```
 
 Pre-built releases are attached to the [Releases](../../releases) page. First launch:
-right-click → Open, or `xattr -dr com.apple.quarantine "A7C Tether.app"`.
+right-click → Open, or `xattr -dr com.apple.quarantine "TetherMoon.app"`.
 
 ## 🌙 First shot
 

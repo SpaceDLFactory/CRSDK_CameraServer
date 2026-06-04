@@ -3,12 +3,12 @@
 # 단일 단위(.app)로 묶어 라이선스의 "inseparable" 형태에 더 부합하고, 더블클릭 실행됨.
 #
 # 사용: ./scripts/make_app.sh
-# 결과: dist/A7C Tether.app  (gitignore — Sony dylib 포함)
+# 결과: dist/TetherMoon.app  (gitignore — Sony dylib 포함)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 SDK_LIB="CrSDK_v2.01.00_20260203a_Mac/RemoteCli/external/crsdk"
-APP="dist/A7C Tether.app"
+APP="dist/TetherMoon.app"
 BIN="crsdk_server"
 VERSION="$(grep '^version' crsdk_server/Cargo.toml | head -1 | cut -d'"' -f2)"  # Cargo에서 버전 일원화
 
@@ -45,9 +45,9 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <key>CFBundleName</key>            <string>A7C Tether</string>
-  <key>CFBundleDisplayName</key>     <string>A7C Tether</string>
-  <key>CFBundleIdentifier</key>      <string>film.neko.a7ctether</string>
+  <key>CFBundleName</key>            <string>TetherMoon</string>
+  <key>CFBundleDisplayName</key>     <string>TetherMoon</string>
+  <key>CFBundleIdentifier</key>      <string>film.neko.tethermoon</string>
   <key>CFBundleVersion</key>         <string>$VERSION</string>
   <key>CFBundleShortVersionString</key> <string>$VERSION</string>
   <key>CFBundlePackageType</key>     <string>APPL</string>

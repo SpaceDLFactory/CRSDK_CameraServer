@@ -1,6 +1,6 @@
 [package]
 name = "crsdk_server"
-version = "0.2.3"
+version = "0.2.4"
 edition = "2021"
 description = "axum HTTP/SSE server exposing crsdk for browser/PWA clients"
 
