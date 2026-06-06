@@ -145,6 +145,25 @@
       linear-gradient(to bottom, rgba(255,255,255,0.06) 1px, transparent 1px);
     background-size: calc((100% / 3)) 100%, 100% calc((100% / 3));
   }
+  .lv-gridsvg {
+    position: absolute; inset: 12px; width: calc(100% - 24px); height: calc(100% - 24px);
+    pointer-events: none; display: none;
+  }
+  .lv-gridsvg line {
+    stroke: rgba(255,255,255,0.16); stroke-width: 1; vector-effect: non-scaling-stroke;
+  }
+  .grid-menu {
+    position: absolute; top: 48px; right: 8px; z-index: 8; display: none;
+    background: rgba(20,20,22,0.95); border: 1px solid var(--line-2); border-radius: 8px;
+    padding: 6px; min-width: 158px; box-shadow: 0 6px 24px rgba(0,0,0,0.5);
+  }
+  .grid-menu.open { display: block; }
+  .grid-menu label {
+    display: flex; align-items: center; gap: 8px; padding: 7px 9px; border-radius: 5px;
+    font-family: var(--font-ui); font-size: 13px; color: var(--fg-dim); cursor: pointer;
+  }
+  .grid-menu label:hover { background: rgba(255,255,255,0.06); color: var(--fg); }
+  .grid-menu input { accent-color: var(--accent); }
   .lv-info {
     position: absolute; bottom: 24px; left: 24px;
     font-family: var(--font-mono);
@@ -391,6 +410,20 @@
     <div class="af-marker" id="afMarker"></div>
     <div class="lv-frame"></div>
     <div class="lv-thirds"></div>
+    <svg class="lv-gridsvg" id="gridSvg" viewBox="0 0 100 100" preserveAspectRatio="none">
+      <g id="gPersp">
+        <line x1="50" y1="50" x2="0"   y2="0"/>   <line x1="50" y1="50" x2="25"  y2="0"/>
+        <line x1="50" y1="50" x2="50"  y2="0"/>   <line x1="50" y1="50" x2="75"  y2="0"/>
+        <line x1="50" y1="50" x2="100" y2="0"/>   <line x1="50" y1="50" x2="100" y2="50"/>
+        <line x1="50" y1="50" x2="100" y2="100"/> <line x1="50" y1="50" x2="75"  y2="100"/>
+        <line x1="50" y1="50" x2="50"  y2="100"/> <line x1="50" y1="50" x2="25"  y2="100"/>
+        <line x1="50" y1="50" x2="0"   y2="100"/> <line x1="50" y1="50" x2="0"   y2="50"/>
+      </g>
+      <g id="gDiag" style="display:none">
+        <line x1="0" y1="0" x2="100" y2="100"/>
+        <line x1="100" y1="0" x2="0" y2="100"/>
+      </g>
+    </svg>
     <div class="lv-corner-tl"></div>
     <div class="lv-corner-tr"></div>
     <div class="lv-corner-bl"></div>
@@ -410,6 +443,11 @@
     <button class="lv-zoom" id="zoomBtn" type="button" data-i18n-title="title.zoom">🔍</button>
     <button class="lv-grid" id="gridBtn" type="button" data-i18n-title="title.grid">▦</button>
     <button class="lv-rotate" id="rotBtn" type="button" data-i18n-title="title.rotate">↻</button>
+    <div class="grid-menu" id="gridMenu">
+      <label><input type="checkbox" id="gkThirds" checked><span data-i18n="grid.thirds">Rule of thirds</span></label>
+      <label><input type="checkbox" id="gkPersp"><span data-i18n="grid.persp">Perspective</span></label>
+      <label><input type="checkbox" id="gkDiag"><span data-i18n="grid.diag">Diagonal</span></label>
+    </div>
   </div>
 
   <div class="panel">
@@ -555,6 +593,7 @@
       'guide.step2':'On the camera: MENU → USB → "USB Connection Mode" → "PC Remote".',
       'guide.step3':'It connects automatically — no button to press.',
       'guide.note':'Still nothing? Make sure the camera is powered on and the USB cable supports data (not charge-only).',
+      'grid.thirds':'Rule of thirds','grid.persp':'Perspective','grid.diag':'Diagonal',
       'title.zoom':'100% focus check (click = point)','title.grid':'Toggle grid','title.rotate':'Rotate live view',
       'card.histogram':'Histogram','card.exposure':'Exposure','card.fileformat':'File Format','card.pictureprofile':'Picture Profile',
       'card.bulb':'Bulb Timer','card.interval':'Interval (Timelapse)','card.drivemetering':'Drive · Metering','card.focus':'Focus Mode','card.saveto':'Save To','card.recent':'Recent',
@@ -577,6 +616,7 @@
       'guide.step2':'카메라에서: MENU → USB → "USB 연결 모드" → "PC 원격".',
       'guide.step3':'자동으로 연결됩니다 — 버튼 누를 필요 없어요.',
       'guide.note':'그래도 안 되면? 카메라 전원이 켜져 있고, USB 케이블이 데이터 지원(충전 전용 아님)인지 확인하세요.',
+      'grid.thirds':'3분할','grid.persp':'소실점','grid.diag':'대각선',
       'title.zoom':'100% 확대 초점확인 (클릭=지점 선택)','title.grid':'3분할 그리드 토글','title.rotate':'라이브뷰 회전',
       'card.histogram':'히스토그램','card.exposure':'노출','card.fileformat':'파일 형식','card.pictureprofile':'픽처 프로파일',
       'card.bulb':'벌브 타이머','card.interval':'인터벌 (타임랩스)','card.drivemetering':'드라이브 · 측광','card.focus':'포커스 모드','card.saveto':'저장 위치','card.recent':'최근',
@@ -599,6 +639,7 @@
       'guide.step2':'カメラで：MENU → USB →「USB接続モード」→「PCリモート」。',
       'guide.step3':'自動的に接続されます — ボタン操作は不要です。',
       'guide.note':'それでも接続できない場合：カメラの電源が入っていること、USB ケーブルがデータ対応（充電専用でない）であることを確認してください。',
+      'grid.thirds':'三分割','grid.persp':'消失点','grid.diag':'対角線',
       'title.zoom':'100% 拡大ピント確認（クリック＝位置）','title.grid':'三分割グリッド切替','title.rotate':'ライブビュー回転',
       'card.histogram':'ヒストグラム','card.exposure':'露出','card.fileformat':'ファイル形式','card.pictureprofile':'ピクチャープロファイル',
       'card.bulb':'バルブタイマー','card.interval':'インターバル（タイムラプス）','card.drivemetering':'ドライブ・測光','card.focus':'フォーカスモード','card.saveto':'保存先','card.recent':'最近',
@@ -1343,7 +1384,7 @@
     ];
   };
   lvWrap.addEventListener('click', (e) => {
-    if (e.target.closest('button')) return;                 // 오버레이 버튼(🔍/▦/↻) 클릭은 무시
+    if (e.target.closest('button, .grid-menu')) return;     // 오버레이 버튼/그리드 메뉴 클릭은 무시
     const r = lvWrap.getBoundingClientRect();
     const sx = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
     const sy = Math.min(1, Math.max(0, (e.clientY - r.top) / r.height));
@@ -1363,6 +1404,7 @@
   // 주: A7C는 자이로 미노출이라 자동회전 불가 → 수동. AF 클릭은 unrotateClick으로 역보정.
   const rotBtn = document.getElementById('rotBtn');
   const lvThirds = document.querySelector('.lv-thirds');
+  const gridSvg = document.getElementById('gridSvg');
   let lvRot = 0;
   const applyRot = () => {
     const r = lvWrap.getBoundingClientRect();
@@ -1370,6 +1412,7 @@
     const t = `rotate(${lvRot}deg) scale(${s})`;
     lvImg.style.transform = t;
     if (lvThirds) lvThirds.style.transform = t; // 그리드도 라이브뷰와 함께 회전
+    if (gridSvg) gridSvg.style.transform = t;    // 소실점/대각선 그리드도 동반 회전
     if (loupeCanvas) loupeCanvas.style.transform = t; // 루페도 동일 회전
   };
   rotBtn.addEventListener('click', () => {
@@ -1415,14 +1458,28 @@
     else lctx.clearRect(0, 0, loupeCanvas.width, loupeCanvas.height);
   });
 
-  // ── 그리드 토글 (3분할 그리드 on/off, 기본 ON) ───────────────────────
+  // ── 그리드 메뉴 (3분할·소실점·대각선 독립 조합) ──────────────────────
+  // ▦ 버튼 → 메뉴 토글. 각 체크박스가 해당 오버레이를 독립적으로 켜고 끔(동시 표시 가능).
   const gridBtn = document.getElementById('gridBtn');
-  let gridOn = true;
-  gridBtn.addEventListener('click', () => {
-    gridOn = !gridOn;
-    lvThirds.style.display = gridOn ? '' : 'none';
-    gridBtn.classList.toggle('off', !gridOn);
+  const gridMenu = document.getElementById('gridMenu');
+  const gkThirds = document.getElementById('gkThirds');
+  const gkPersp = document.getElementById('gkPersp');
+  const gkDiag = document.getElementById('gkDiag');
+  const gPersp = document.getElementById('gPersp');
+  const gDiag = document.getElementById('gDiag');
+  const renderGrids = () => {
+    lvThirds.style.display = gkThirds.checked ? '' : 'none';
+    gPersp.style.display = gkPersp.checked ? '' : 'none';
+    gDiag.style.display = gkDiag.checked ? '' : 'none';
+    gridSvg.style.display = (gkPersp.checked || gkDiag.checked) ? '' : 'none';
+    gridBtn.classList.toggle('off', !(gkThirds.checked || gkPersp.checked || gkDiag.checked));
+  };
+  gridBtn.addEventListener('click', (e) => { e.stopPropagation(); gridMenu.classList.toggle('open'); });
+  [gkThirds, gkPersp, gkDiag].forEach(c => c.addEventListener('change', renderGrids));
+  document.addEventListener('click', (e) => {       // 바깥 클릭 시 메뉴 닫기
+    if (!gridMenu.contains(e.target) && e.target !== gridBtn) gridMenu.classList.remove('open');
   });
+  renderGrids();                                     // 초기 상태(3분할 ON)
 
   // ── 히스토그램 (우측 패널, 라이브뷰 프레임 샘플링 → RGB 256-bin) ──────
   // 라이브뷰 위 오버레이 대신 패널에 표시(어두운 장면 시인성). 피킹과 별도 캔버스.
