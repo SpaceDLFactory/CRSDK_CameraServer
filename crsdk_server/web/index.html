@@ -1471,7 +1471,7 @@
     lvThirds.style.display = gkThirds.checked ? '' : 'none';
     gPersp.style.display = gkPersp.checked ? '' : 'none';
     gDiag.style.display = gkDiag.checked ? '' : 'none';
-    gridSvg.style.display = (gkPersp.checked || gkDiag.checked) ? '' : 'none';
+    gridSvg.style.display = (gkPersp.checked || gkDiag.checked) ? 'block' : 'none'; // CSS 기본이 none이라 'block' 명시
     gridBtn.classList.toggle('off', !(gkThirds.checked || gkPersp.checked || gkDiag.checked));
   };
   gridBtn.addEventListener('click', (e) => { e.stopPropagation(); gridMenu.classList.toggle('open'); });
