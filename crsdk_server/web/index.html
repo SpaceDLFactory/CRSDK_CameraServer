@@ -141,16 +141,18 @@
     position: absolute; inset: 12px;
     pointer-events: none;
     background-image:
-      linear-gradient(to right, rgba(255,255,255,0.06) 1px, transparent 1px),
-      linear-gradient(to bottom, rgba(255,255,255,0.06) 1px, transparent 1px);
+      linear-gradient(to right, rgba(255,255,255,0.55) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255,255,255,0.55) 1px, transparent 1px);
     background-size: calc((100% / 3)) 100%, 100% calc((100% / 3));
+    filter: drop-shadow(0 0 1px rgba(0,0,0,0.8)); /* 밝은 장면에서도 보이게 */
   }
   .lv-gridsvg {
     position: absolute; inset: 12px; width: calc(100% - 24px); height: calc(100% - 24px);
     pointer-events: none; display: none;
+    filter: drop-shadow(0 0 1px rgba(0,0,0,0.8));
   }
   .lv-gridsvg line {
-    stroke: rgba(255,255,255,0.16); stroke-width: 1; vector-effect: non-scaling-stroke;
+    stroke: rgba(255,255,255,0.6); stroke-width: 1.2; vector-effect: non-scaling-stroke;
   }
   .grid-menu {
     position: absolute; top: 48px; right: 8px; z-index: 8; display: none;
