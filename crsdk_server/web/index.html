@@ -290,6 +290,8 @@
   }
 
   .btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 4px; }
+  .btn .key { font-size: 9px; opacity: 0.5; border: 1px solid currentColor; border-radius: 3px; padding: 0 3px; margin: 0 1px; }
+  .btn.active .key { opacity: 0.85; }
   .nf-slider {
     display: grid; grid-template-columns: auto 1fr auto auto;
     align-items: center; gap: 8px; margin-top: 8px;
@@ -523,11 +525,9 @@
         <button class="btn" type="button" data-code="265" data-val="3">AF-C</button>
         <button class="btn" type="button" data-code="265" data-val="6">DMF</button>
       </div>
-      <div class="nf-slider">
-        <span class="k">Far</span>
-        <input type="range" id="nfSlider" min="-1" max="1" step="1" value="0" disabled>
-        <span class="k">Near</span>
-        <span class="nf-val" id="nfVal">0</span>
+      <div class="btn-row" style="grid-template-columns:1fr 1fr;">
+        <button class="btn" id="nfFar" type="button" disabled>◀ Far <span class="key">W</span></button>
+        <button class="btn" id="nfNear" type="button" disabled>Near <span class="key">S</span> ▶</button>
       </div>
       <div class="btn-row" style="grid-template-columns:1fr 1fr;">
         <button class="btn" id="peakBtn" type="button" data-i18n="btn.peakoff">Peaking OFF</button>
@@ -1119,9 +1119,10 @@
   );
   // MF 초점 슬라이더 — 카메라가 min/step/max 알려줌(GetSelectControlCode).
   // 슬라이드 → 놓을 때 그 step을 NearFar로 실행 → 중앙(0)으로 리셋 (joystick 패턴).
-  const nfSlider = document.getElementById('nfSlider');
-  const nfVal    = document.getElementById('nfVal');
+  const nfFar  = document.getElementById('nfFar');
+  const nfNear = document.getElementById('nfNear');
   let nfReady = false;
+  let nfStep = 3;   // 한 틱당 NearFar 이동량(기본; 카메라가 step을 주면 보정)
 
   const setupNearFar = async () => {
     if (nfReady) return;
@@ -1129,51 +1130,55 @@
       const r = await fetch('/api/focus_nearfar/info', { cache: 'no-store' });
       if (!r.ok) return;
       const info = await r.json();
-      // Range(0x4000): values[0..3] = [min, max, step] (실측 — 후행 0 padding 있을 수 있음).
-      // Array(0x2000): enum, min/max로 환산.
-      let min = -1, max = 1, step = 1;
+      // 카메라가 주는 step 크기를 한 틱 이동량으로 사용(Range면 values[2]).
       if (info.is_range && info.values.length >= 3) {
-        [min, max, step] = info.values;
-      } else if (info.is_array && info.values.length > 0) {
-        min = Math.min(...info.values);
-        max = Math.max(...info.values);
-        step = 1; // enum이라도 정수 step. 정확히 매핑하려면 snap 로직 추가 가능.
+        const s = Math.abs(info.values[2]) || 0;
+        if (s > 0) nfStep = s;
       }
-      nfSlider.min = String(min);
-      nfSlider.max = String(max);
-      nfSlider.step = String(Math.max(1, Math.abs(step)));
-      nfSlider.value = '0';
-      nfSlider.disabled = false;
-      nfVal.textContent = '0';
+      nfFar.disabled = false;
+      nfNear.disabled = false;
       nfReady = true;
     } catch (e) { console.warn('nearfar info', e); }
   };
 
-  // 조이스틱식 연속 이동: 누르고 있는 동안 슬라이더 위치(부호·크기)만큼 반복 전송,
-  // 놓으면 정지 + 중앙(0) 스프링백. (예전엔 드래그→놓기 1회라 많이 움직이려면 반복해야 했음)
-  let nfTimer = null;
+  // Near/Far 버튼 + W/S 단축키 — 누르거나 키를 유지하면 반복 이동, 떼면 정지.
+  // (A7C는 절대 초점 위치 미지원 → 상대 NearFar 너지만 가능. 양수=Far/음수=Near 규약)
+  let nfTimer = null, nfDir = 0;
   const nfSend = () => {
-    const step = parseInt(nfSlider.value, 10);
-    if (step === 0) return;
     fetch('/api/focus_nearfar', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ step }),
+      body: JSON.stringify({ step: nfDir * nfStep }),
     }).catch(() => {});
   };
   const nfStop = () => {
-    if (!nfTimer) return;                       // 슬라이더 조작 중일 때만 동작
-    clearInterval(nfTimer); nfTimer = null;
-    nfSlider.value = '0'; nfVal.textContent = '0';
+    if (nfTimer) { clearInterval(nfTimer); nfTimer = null; }
+    nfDir = 0;
+    nfFar.classList.remove('active'); nfNear.classList.remove('active');
   };
-  nfSlider.addEventListener('input', () => { nfVal.textContent = nfSlider.value; });
-  nfSlider.addEventListener('pointerdown', () => {
-    if (nfTimer) clearInterval(nfTimer);
+  const nfStart = (dir, btn) => {
+    if (!nfReady || nfDir === dir) return;
+    nfStop();
+    nfDir = dir;
+    btn.classList.add('active');
     nfSend();                                  // 즉시 1회
-    nfTimer = setInterval(nfSend, 150);        // 유지 중 반복(슬라이더 위치=속도)
-  });
-  // window에서 받아 슬라이더 밖에서 놓아도 정지(range 네이티브 드래그는 안 건드림)
+    nfTimer = setInterval(nfSend, 130);        // 유지 중 반복
+  };
+  nfFar.addEventListener('pointerdown', () => nfStart(+1, nfFar));
+  nfNear.addEventListener('pointerdown', () => nfStart(-1, nfNear));
   window.addEventListener('pointerup', nfStop);
   window.addEventListener('pointercancel', nfStop);
+  // 단축키: W=Far, S=Near. 입력칸 포커스 중엔 무시.
+  const nfTyping = () => /INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName || '');
+  window.addEventListener('keydown', (e) => {
+    if (e.repeat || nfTyping()) return;
+    const k = e.key.toLowerCase();
+    if (k === 'w') nfStart(+1, nfFar);
+    else if (k === 's') nfStart(-1, nfNear);
+  });
+  window.addEventListener('keyup', (e) => {
+    const k = e.key.toLowerCase();
+    if (k === 'w' || k === 's') nfStop();
+  });
   // WB 색온도 슬라이더 — 카메라가 켈빈 생값(5500 등)을 그대로 보고/수용. 범위는 Range property에서
   // 불러오며(위 poll), 비정상/부재 시 HTML 기본(2500~9900/100K)으로 폴백.
   wbKelvin.addEventListener('input', () => { wbKelvinVal.textContent = wbKelvin.value + 'K'; });
