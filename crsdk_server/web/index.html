@@ -966,7 +966,7 @@
     ko:{1:'LPF브라켓',2:'리모컨',3:'미러업',4:'셀프1',5:'셀프2'},
     ja:{1:'LPFブラケット',2:'リモコン',3:'ミラーアップ',4:'セルフ1',5:'セルフ2'}};
   // 클릭으로 위치 지정이 먹히는 Flexible/Expand 계열만.
-  const POSITIONAL_AREA = new Set([4,5,6,7,8,0x14,0x15,0x16,0x17,0x18,0x19,0x1A]);
+  const POSITIONAL_AREA = new Set([2,4,5,6,7,8,0x12,0x14,0x15,0x16,0x17,0x18,0x19,0x1A]); // 존·플렉서블·확장·트래킹
 
   // raw 값 → 라벨. 매핑/유효성 실패 시 null 반환 → fillSelect가 옵션에서 제외
   // (SDK가 allowed 배열에 끼워넣는 쓰레기값 방어).
@@ -1377,14 +1377,15 @@
   const afSize = document.getElementById('afSize');
   // nx,ny = 카메라에 보낼 미회전 센서 좌표. dispX,dispY = 마커 표시 좌표(화면 클릭 위치).
   // 마커는 회전 변환을 받지 않는 형제라 화면 좌표로 찍어야 클릭한 곳에 보인다.
-  const sendAfPoint = async (nx, ny, dispX = nx, dispY = ny) => {
+  const sendAfPoint = async (nx, ny, dispX = nx, dispY = ny, area = Number(afSize.value)) => {
     afMarker.style.left = (dispX * 100) + '%';
     afMarker.style.top  = (dispY * 100) + '%';
+    afMarker.style.display = '';   // 탭 즉시 마커 표시(폴이 곧 실제 영역으로 보정)
     try {
       await fetch('/api/af_point', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ x: nx, y: ny, area: Number(afSize.value) }),
+        body: JSON.stringify({ x: nx, y: ny, area }),
       });
     } catch (e) { console.warn('af_point', e); }
   };
@@ -1408,12 +1409,16 @@
     const sy = Math.min(1, Math.max(0, (e.clientY - r.top) / r.height));
     const [nx, ny] = unrotateClick(sx, sy, r);
     if (loupeOn) { lfx = nx; lfy = ny; return; }            // 줌 모드: 확대 지점 선택(AF 아님)
-    if (!POSITIONAL_AREA.has(Number(afSize.value))) return; // 와이드/존/중앙/트래킹: 위치 무시
-    sendAfPoint(nx, ny, sx, sy);
+    sendAfPoint(nx, ny, sx, sy, tapArea());
   });
+  // 탭-투-포커스 영역: 위치 지정 모드(존·플렉서블 등)면 그대로, 와이드/중앙 등 고정 모드면
+  // Flexible Spot M으로 전환해 그 지점에 배치(카메라 터치 포커스와 동일).
+  const tapArea = () => {
+    const cur = Number(afSize.value);
+    return POSITIONAL_AREA.has(cur) ? cur : 5; // 5 = Flexible Spot M
+  };
   document.getElementById('afCenterBtn').addEventListener('click', () => {
-    if (!POSITIONAL_AREA.has(Number(afSize.value))) return;
-    sendAfPoint(0.5, 0.5);
+    sendAfPoint(0.5, 0.5, 0.5, 0.5, tapArea());
   });
   // AF 박스 크기 변경 → 즉시 카메라 FocusArea 설정 (275=0x0113). poll이 마커 크기 반영.
   afSize.addEventListener('change', () => setProp(275, Number(afSize.value)));

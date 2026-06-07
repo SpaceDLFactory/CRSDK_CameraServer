@@ -829,9 +829,9 @@ async fn af_point(State(s): State<AppState>, Json(b): Json<AfPoint>) -> impl Int
     let x = cal.x(b.x);
     let y = cal.y(b.y); // Y는 S커브 역보정 (모델별)
     let packed = ((x << 16) | y) as u64;
-    // 위치 지정이 먹히는 Flexible/Expand 계열만 통과(트래킹 포함), 그 외엔 S.
+    // 위치 지정이 먹히는 영역만 통과: 존(0x02)·Flexible/Expand(0x04~08)·트래킹(0x12,0x14~1A). 그 외엔 S.
     let area = match b.area {
-        Some(v @ (0x04..=0x08 | 0x14..=0x1A)) => v,
+        Some(v @ (0x02 | 0x04..=0x08 | 0x12 | 0x14..=0x1A)) => v,
         _ => crsdk::properties::focus_area::FLEXIBLE_SPOT_S,
     };
     let r = tokio::task::spawn_blocking(move || {
