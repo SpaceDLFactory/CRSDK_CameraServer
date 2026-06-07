@@ -1149,20 +1149,31 @@
     } catch (e) { console.warn('nearfar info', e); }
   };
 
-  nfSlider.addEventListener('input', () => { nfVal.textContent = nfSlider.value; });
-  nfSlider.addEventListener('change', async () => {
+  // 조이스틱식 연속 이동: 누르고 있는 동안 슬라이더 위치(부호·크기)만큼 반복 전송,
+  // 놓으면 정지 + 중앙(0) 스프링백. (예전엔 드래그→놓기 1회라 많이 움직이려면 반복해야 했음)
+  let nfTimer = null;
+  const nfSend = () => {
     const step = parseInt(nfSlider.value, 10);
     if (step === 0) return;
-    try {
-      await fetch('/api/focus_nearfar', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ step }),
-      });
-    } catch (e) { console.warn('nearfar', e); }
-    nfSlider.value = '0';
-    nfVal.textContent = '0';
+    fetch('/api/focus_nearfar', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ step }),
+    }).catch(() => {});
+  };
+  const nfStop = () => {
+    if (!nfTimer) return;                       // 슬라이더 조작 중일 때만 동작
+    clearInterval(nfTimer); nfTimer = null;
+    nfSlider.value = '0'; nfVal.textContent = '0';
+  };
+  nfSlider.addEventListener('input', () => { nfVal.textContent = nfSlider.value; });
+  nfSlider.addEventListener('pointerdown', () => {
+    if (nfTimer) clearInterval(nfTimer);
+    nfSend();                                  // 즉시 1회
+    nfTimer = setInterval(nfSend, 150);        // 유지 중 반복(슬라이더 위치=속도)
   });
+  // window에서 받아 슬라이더 밖에서 놓아도 정지(range 네이티브 드래그는 안 건드림)
+  window.addEventListener('pointerup', nfStop);
+  window.addEventListener('pointercancel', nfStop);
   // WB 색온도 슬라이더 — 카메라가 켈빈 생값(5500 등)을 그대로 보고/수용. 범위는 Range property에서
   // 불러오며(위 poll), 비정상/부재 시 HTML 기본(2500~9900/100K)으로 폴백.
   wbKelvin.addEventListener('input', () => { wbKelvinVal.textContent = wbKelvin.value + 'K'; });
