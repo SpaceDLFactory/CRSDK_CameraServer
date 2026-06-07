@@ -291,6 +291,8 @@
 
   .btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 4px; }
   .btn .key { font-size: 9px; opacity: 0.5; border: 1px solid currentColor; border-radius: 3px; padding: 0 3px; margin: 0 1px; }
+  .dpad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin-top: 6px; }
+  .dpad .btn { font-size: 14px; padding: 6px 0; }
   .btn.active .key { opacity: 0.85; }
   .nf-slider {
     display: grid; grid-template-columns: auto 1fr auto auto;
@@ -534,6 +536,11 @@
         <button class="btn" id="afCenterBtn" type="button" data-i18n="btn.afcenter">AF center</button>
       </div>
       <div class="row" style="margin-top:6px;"><span class="k" data-i18n="lbl.afarea">AF area</span><select class="sel" id="afSize" data-code="275"><option value="4" data-i18n="opt.flexs">Flexible S</option><option value="5" data-i18n="opt.flexm">Flexible M</option><option value="6" data-i18n="opt.flexl">Flexible L</option></select></div>
+      <div class="dpad">
+        <span></span><button class="btn" id="afUp" type="button" aria-label="up">↑</button><span></span>
+        <button class="btn" id="afLeft" type="button" aria-label="left">←</button><span></span><button class="btn" id="afRight" type="button" aria-label="right">→</button>
+        <span></span><button class="btn" id="afDown" type="button" aria-label="down">↓</button><span></span>
+      </div>
       <button class="btn" id="halfBtn" type="button" data-i18n="btn.half" style="width:100%;margin-top:6px;">Half-press (hold → AF)</button>
       <div class="row" style="margin-top:6px;color:var(--fg-mute);font-size:10px;">
         <span data-i18n="hint.afpoint">AF point: click the live view (center by default)</span>
@@ -604,7 +611,7 @@
       'opt.flexs':'Flexible S','opt.flexm':'Flexible M','opt.flexl':'Flexible L',
       'hint.bulb':'Sets the shutter to BULB for an N-second exposure (Manual mode required). For exposures longer than 30s.',
       'hint.interval':'Software interval. For RAW use interval ≥10s (download ~8s). MF recommended.',
-      'hint.afpoint':'AF point: click the live view (center by default)',
+      'hint.afpoint':'Tap the live view to focus; nudge with the D-pad / arrow keys.',
       'ph.savepath':'PC save folder path','ph.prefix':'Filename prefix (e.g. SHOOT)',
       'status.reconnect':'· click CAPTURE → retry connect',
       'dyn.exposing':'Exposing','dyn.bulbcaptured':'● BULB CAPTURED','dyn.interval':'Interval','dyn.stop':'Stop',
@@ -627,7 +634,7 @@
       'opt.flexs':'플렉서블 S','opt.flexm':'플렉서블 M','opt.flexl':'플렉서블 L',
       'hint.bulb':'셔터를 BULB로 바꿔 N초 노출 (Manual 모드 필요). 30초 초과 장노출용',
       'hint.interval':'소프트웨어 인터벌. RAW는 간격 ≥10초 권장(다운로드 ~8s). 초점은 MF 권장',
-      'hint.afpoint':'AF 포인트: LiveView 클릭 (기본 중앙)',
+      'hint.afpoint':'라이브뷰를 탭해서 포커스; D-pad·방향키로 미세 이동.',
       'ph.savepath':'PC 저장 폴더 경로','ph.prefix':'파일명 접두사 (예: SHOOT)',
       'status.reconnect':'· click CAPTURE → /api/connect 재시도',
       'dyn.exposing':'노출중','dyn.bulbcaptured':'● 벌브 촬영','dyn.interval':'인터벌','dyn.stop':'정지',
@@ -650,7 +657,7 @@
       'opt.flexs':'フレキシブル S','opt.flexm':'フレキシブル M','opt.flexl':'フレキシブル L',
       'hint.bulb':'シャッターを BULB にして N 秒露光（Manual モード必須）。30 秒超の長秒露光用。',
       'hint.interval':'ソフトウェアインターバル。RAW は間隔 ≥10 秒推奨（ダウンロード約 8 秒）。ピントは MF 推奨。',
-      'hint.afpoint':'AF ポイント：ライブビューをクリック（既定は中央）',
+      'hint.afpoint':'ライブビューをタップでフォーカス; D-pad・矢印キーで微調整。',
       'ph.savepath':'PC 保存フォルダのパス','ph.prefix':'ファイル名プレフィックス（例: SHOOT）',
       'status.reconnect':'· CAPTURE をクリック → 再接続',
       'dyn.exposing':'露出中','dyn.bulbcaptured':'● バルブ撮影','dyn.interval':'インターバル','dyn.stop':'停止',
@@ -1402,23 +1409,52 @@
       Math.min(1, Math.max(0, loy / r.height + 0.5)),
     ];
   };
-  lvWrap.addEventListener('click', (e) => {
-    if (e.target.closest('button, .grid-menu')) return;     // 오버레이 버튼/그리드 메뉴 클릭은 무시
-    const r = lvWrap.getBoundingClientRect();
-    const sx = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
-    const sy = Math.min(1, Math.max(0, (e.clientY - r.top) / r.height));
-    const [nx, ny] = unrotateClick(sx, sy, r);
-    if (loupeOn) { lfx = nx; lfy = ny; return; }            // 줌 모드: 확대 지점 선택(AF 아님)
-    sendAfPoint(nx, ny, sx, sy, tapArea());
-  });
   // 탭-투-포커스 영역: 위치 지정 모드(존·플렉서블 등)면 그대로, 와이드/중앙 등 고정 모드면
   // Flexible Spot M으로 전환해 그 지점에 배치(카메라 터치 포커스와 동일).
   const tapArea = () => {
     const cur = Number(afSize.value);
     return POSITIONAL_AREA.has(cur) ? cur : 5; // 5 = Flexible Spot M
   };
-  document.getElementById('afCenterBtn').addEventListener('click', () => {
-    sendAfPoint(0.5, 0.5, 0.5, 0.5, tapArea());
+  // AF 영역 위치(화면 정규화) — 클릭/D-pad/방향키가 공유. placeAf가 미회전 센서좌표로 변환해 전송.
+  let afX = 0.5, afY = 0.5;
+  const placeAf = (sx, sy) => {
+    afX = Math.min(1, Math.max(0, sx));
+    afY = Math.min(1, Math.max(0, sy));
+    const r = lvWrap.getBoundingClientRect();
+    const [nx, ny] = unrotateClick(afX, afY, r);
+    sendAfPoint(nx, ny, afX, afY, tapArea());
+  };
+  lvWrap.addEventListener('click', (e) => {
+    if (e.target.closest('button, .grid-menu')) return;     // 오버레이 버튼/그리드 메뉴 클릭은 무시
+    const r = lvWrap.getBoundingClientRect();
+    const sx = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
+    const sy = Math.min(1, Math.max(0, (e.clientY - r.top) / r.height));
+    if (loupeOn) { const [nx, ny] = unrotateClick(sx, sy, r); lfx = nx; lfy = ny; return; } // 줌: 확대 지점
+    placeAf(sx, sy);
+  });
+  document.getElementById('afCenterBtn').addEventListener('click', () => placeAf(0.5, 0.5));
+
+  // ── AF D-pad 너지 + 방향키 (영역 미세 이동) ──────────────────────────
+  const AF_NUDGE = 0.04;                       // 한 스텝당 화면 비율
+  let dpadTimer = null;
+  const nudge = (dx, dy) => placeAf(afX + dx, afY + dy);
+  const startNudge = (dx, dy) => {
+    clearInterval(dpadTimer); nudge(dx, dy);
+    dpadTimer = setInterval(() => nudge(dx, dy), 150); // 누르고 유지하면 연속
+  };
+  const stopNudge = () => { if (dpadTimer) { clearInterval(dpadTimer); dpadTimer = null; } };
+  [['afUp',0,-1],['afDown',0,1],['afLeft',-1,0],['afRight',1,0]].forEach(([id, dx, dy]) =>
+    document.getElementById(id).addEventListener('pointerdown', () => startNudge(dx * AF_NUDGE, dy * AF_NUDGE)));
+  window.addEventListener('pointerup', stopNudge);
+  window.addEventListener('pointercancel', stopNudge);
+  window.addEventListener('keydown', (e) => {                // 방향키로도 미세 이동
+    if (nfTyping()) return;
+    let dx = 0, dy = 0;
+    if (e.key === 'ArrowUp') dy = -1; else if (e.key === 'ArrowDown') dy = 1;
+    else if (e.key === 'ArrowLeft') dx = -1; else if (e.key === 'ArrowRight') dx = 1;
+    else return;
+    e.preventDefault();
+    placeAf(afX + dx * AF_NUDGE, afY + dy * AF_NUDGE);
   });
   // AF 박스 크기 변경 → 즉시 카메라 FocusArea 설정 (275=0x0113). poll이 마커 크기 반영.
   afSize.addEventListener('change', () => setProp(275, Number(afSize.value)));
