@@ -6,15 +6,16 @@ fn main() {
     // 타깃 OS (build.rs는 호스트에서 돌지만 cargo가 타깃을 env로 준다)
     let is_windows = env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows");
 
-    // SDK 루트 — OS별 폴더. Windows SDK는 별도 다운로드(폴더명은 Windows 세션에서 확정).
-    let sdk_root = if is_windows {
-        manifest.join("CrSDK_Win") // TODO(windows): 실제 Windows SDK 압축 해제 경로로
+    // SDK 헤더/라이브러리 경로 — OS별 폴더명·하위구조가 다름.
+    //   macOS  : CrSDK_..._Mac/RemoteCli/{app/CRSDK, external/crsdk}
+    //   Windows: CrSDK_Win/{app/CRSDK, external/crsdk}  (RemoteCli.zip 풀면 RemoteCli 폴더 없이 바로)
+    let (sdk_include, sdk_lib) = if is_windows {
+        let root = manifest.join("CrSDK_Win");
+        (root.join("app/CRSDK"), root.join("external/crsdk"))
     } else {
-        manifest.join("CrSDK_v2.01.00_20260203a_Mac")
+        let root = manifest.join("CrSDK_v2.01.00_20260203a_Mac/RemoteCli");
+        (root.join("app/CRSDK"), root.join("external/crsdk"))
     };
-    // SDK headers (CameraRemote_SDK.h, ...) / lib (libCr_Core.dylib · Cr_Core.lib)
-    let sdk_include = sdk_root.join("RemoteCli/app/CRSDK");
-    let sdk_lib = sdk_root.join("RemoteCli/external/crsdk");
 
     // Wrapper sources
     let wrapper_dir = manifest.join("wrapper");
