@@ -81,11 +81,36 @@ fn main() {
             }
         }
     }
-    // TODO(windows): CrAdapter DLL(Cr_PTP_USB.dll 등)을 exe 옆에 복사. SDK의 Windows 플러그인
-    // lookup 규칙(exe 기준 CrAdapter/ 인지 등)을 실측 후 확정.
+    // ── Windows: SDK DLL 배치 ────────────────────────────────────────────────
+    //
+    // Windows엔 rpath가 없어 Cr_Core.dll(+ monitor_protocol*.dll)은 exe 옆에,
+    // USB/IP transport 플러그인(Cr_PTP_USB.dll 등)은 exe 옆 CrAdapter\ 안에 있어야
+    // Cr_Core가 로드한다. OUT_DIR에서 binary dir(target\<profile>)을 파생해 거기로 복사.
     #[cfg(windows)]
     {
-        let _ = &sdk_lib; // (Windows 세션에서 구현)
+        let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
+        if let Some(binary_dir) = out_dir.ancestors().nth(3) {
+            // top-level *.dll → binary_dir\
+            for entry in std::fs::read_dir(&sdk_lib).expect("read SDK lib dir") {
+                let p = entry.unwrap().path();
+                if p.extension().and_then(|e| e.to_str()) == Some("dll") {
+                    let dst = binary_dir.join(p.file_name().unwrap());
+                    std::fs::copy(&p, &dst).expect("copy SDK dll");
+                }
+            }
+            // CrAdapter\*.dll → binary_dir\CrAdapter\
+            let adapter_src = sdk_lib.join("CrAdapter");
+            let adapter_dst = binary_dir.join("CrAdapter");
+            std::fs::create_dir_all(&adapter_dst).expect("create CrAdapter dir");
+            for entry in std::fs::read_dir(&adapter_src).expect("read CrAdapter dir") {
+                let p = entry.unwrap().path();
+                if p.extension().and_then(|e| e.to_str()) == Some("dll") {
+                    let dst = adapter_dst.join(p.file_name().unwrap());
+                    std::fs::copy(&p, &dst).expect("copy CrAdapter dll");
+                }
+            }
+            println!("cargo:warning=Copied SDK DLLs to {binary_dir:?}");
+        }
     }
 
     // Generate Rust FFI bindings from wrapper.h
