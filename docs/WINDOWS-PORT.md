@@ -1,7 +1,13 @@
 # Windows 포팅 — 작업 가이드 (windows-prep 브랜치)
 
-> 이 브랜치는 **크로스플랫폼 구조화(cfg 스캐폴딩)** 가 끝난 상태다. macOS 빌드는 그대로 통과.
-> Windows 머신에서 아래 **빈칸(TODO)** 만 채우면 된다. 전략: **B(본인 Windows 머신, 빌드+실카메라)**.
+> **상태(2026-06): Windows 빌드 + 서버 실행 + SDK init + 웹 UI 서빙 검증 완료.**
+> 남은 단 하나: **실제 A7C를 Windows에 PC Remote 모드로 연결한 live 테스트**(enum/connect/촬영 + §2.3 문자열 인코딩 실측). 단일 인스턴스 named mutex(§2.5)는 선택.
+>
+> 검증 환경(실제 머신): Rust 1.96 msvc, VS BuildTools `F:\BuildTools`, LLVM `F:\LLVM\bin`(libclang), Win SDK는 `CrSDK_Win/`(gitignore). 빌드:
+> ```
+> set "LIBCLANG_PATH=F:\LLVM\bin"   # 따옴표 필수 — trailing space 들어가면 bindgen이 못 찾음
+> cargo build -p crsdk_server
+> ```
 
 ## 0. 시작 방법
 ```
@@ -26,27 +32,20 @@ git checkout windows-prep
 
 > 각 항목은 코드에 마커가 있다: `grep -rn "TODO(windows)"`
 
-### 2.1 SDK 경로 — `build.rs:~11`
-```rust
-manifest.join("CrSDK_Win") // ← 실제 압축 해제한 Windows SDK 폴더명/위치로
-```
-- Windows SDK의 헤더 경로(`.../app/CRSDK`)와 lib 경로(`.../external/crsdk`)가 macOS와 같은 하위구조인지 확인. 다르면 `sdk_include`/`sdk_lib` 조합도 맞춘다.
-- `Cr_Core.lib`(import lib)가 `sdk_lib`에 있는지 확인 (`rustc-link-lib=dylib=Cr_Core` 가 이를 찾음).
+### 2.1 SDK 경로 — `build.rs` ✅ 완료
+- `is_windows`면 `CrSDK_Win/{app/CRSDK, external/crsdk}` 사용(Mac는 `RemoteCli/` 하위). `Cr_Core.lib` 확인됨.
+- 주의: Win64 SDK zip은 중첩(`RemoteCli.zip` 안에 또 있음). `RemoteCli.zip`만 풀면 `RemoteCli/` 없이 바로 `app/`,`external/`.
 
-### 2.2 CrAdapter 플러그인 배치 — `build.rs:~83` (`#[cfg(windows)]` 블록)
-- macOS는 NSBundle 기준 `Contents/Frameworks/CrAdapter`에 심링크. **Windows엔 NSBundle 없음.**
-- **실측**: Windows SDK의 RemoteSampleApp이 USB 플러그인(`Cr_PTP_USB.dll`)을 어디서 찾는가? (대개 **exe와 같은 폴더의 `CrAdapter\`**).
-- 확정되면 그 위치로 `CrAdapter` DLL들을 **복사**(심링크 대신). `dev` 빌드는 `target/debug/` 옆, 배포는 exe 옆.
+### 2.2 CrAdapter 플러그인 배치 — `build.rs` `#[cfg(windows)]` ✅ 완료
+- OUT_DIR에서 `target\<profile>` 파생 → top-level `*.dll`(Cr_Core, monitor_protocol*)은 exe 옆에, `CrAdapter\*.dll`(Cr_PTP_USB/IP, libssh2, libusb-1.0)은 exe 옆 `CrAdapter\`로 **복사**. (절대 하드코딩 경로 없음.)
 
-### 2.3 CrChar(문자열) 인코딩 — lib `src/enumerate.rs` 등
-- **확정 사실**: `CrTypes.h`에서 Windows는 `CrChar = wchar_t`(UTF-16), macOS는 `char`(UTF-8).
-- `read_cchar`(enumerate.rs)와 모델/이름/연결타입 getter들이 macOS는 `*const c_char`(UTF-8) 가정.
-- **Windows**: `GetModel()`/`GetName()` 등이 `wchar_t*` 반환 → **UTF-16→UTF-8 변환** 필요.
-- 권장: wrapper.cpp 쪽에서 Windows일 때 `WideCharToMultiByte`로 UTF-8 변환해 반환(현재 `get_property_string`이 UTF-16→ASCII 하듯), lib 시그니처는 유지. 또는 lib에 `#[cfg(windows)]` 변환 분기.
+### 2.3 CrChar(문자열) 인코딩 — ⚠️ **live 카메라로 실측 필요**
+- **정정**: `CrTypes.h`의 `CrChar = wchar_t`는 **`UNICODE`/`_UNICODE` 매크로가 정의됐을 때만**. cc-rs(cl.exe)는 이를 정의하지 않으므로 우리 빌드에선 `CrChar = char`(CrAChar) → `GetName()`/`GetModel()`이 `const char*`로 컴파일됨(= macOS와 동일, 변환 불필요).
+- **남은 위험**: 정작 사전컴파일된 `Cr_Core.dll`이 UNICODE(wchar) 빌드라면, DLL이 돌려주는 버퍼는 UTF-16인데 우리는 char로 읽어 깨질 수 있음("I\0L\0C\0E\0…" 형태). → **실카메라로 모델명 확인**해서 정상이면 끝, 깨지면 wrapper에서 `UNICODE` 정의 + `WideCharToMultiByte` 변환으로 전환.
 
-### 2.4 USB 억제기 — `main.rs:~79` (현재 비-macOS no-op)
-- macOS의 ptpcamerad 억제는 Windows에 없음. **실측**: A7C가 Windows에서 PTP/USB로 잡히려면 드라이버가 필요한지(WinUSB/libusb, Zadig 등) SDK Readme Windows 섹션 확인.
-- 보통 SDK가 알아서 처리 → no-op 유지 가능. 문제 시 드라이버 안내 추가.
+### 2.4 USB 억제기 — `main.rs` 비-macOS no-op ✅ (유지)
+- macOS의 ptpcamerad 억제는 Windows에 없음 → no-op 유지. WARN 로그는 macOS에서만 뜨도록 cfg 게이팅함.
+- A7C는 Windows에서 카메라 메뉴 **USB 연결모드 = PC Remote** 여야 CrSDK가 enum함(Imaging Edge 가상 웹캠 디바이스와 무관).
 
 ### 2.5 단일 인스턴스 — `main.rs:~1200` (현재 비-unix no-op)
 - 권장: **named mutex**(`CreateMutexW` + `GetLastError()==ERROR_ALREADY_EXISTS`) 로 중복 실행 방지. 또는 `tasklist`/`taskkill`.
@@ -60,9 +59,9 @@ manifest.join("CrSDK_Win") // ← 실제 압축 해제한 Windows SDK 폴더명/
 ---
 
 ## 3. 검증 순서 (매 단계 컴파일)
-1. [ ] `cargo build -p crsdk_server` — 빌드 통과까지 §2.1→2.2→2.3 순서로 에러 잡기
-2. [ ] 실행 후 `Cr_Core.dll`·`CrAdapter\*.dll`이 exe 옆에 있어야 로드됨 (없으면 `0xc000007b`/not found)
-3. [ ] 카메라 USB 연결 → `GET /api/_debug/enum` 으로 발견 확인 (모델명이 깨지면 §2.3 인코딩 문제)
+1. [x] `cargo build -p crsdk_server` — 빌드 통과 (wrapper.cpp `__builtin_memcpy`→`memcpy`, `LIBCLANG_PATH` 따옴표 이슈 해결)
+2. [x] 실행 → `Cr_Core.dll`·`CrAdapter\*.dll` 자동 복사·로드, SDK init OK, 8080 리슨, 웹 UI 서빙
+3. [ ] **카메라 USB(PC Remote) 연결** → enum 발견 + 모델명 안 깨지는지(§2.3) 확인
 4. [ ] 연결·라이브뷰·촬영 스모크 테스트
 5. [ ] 단일 인스턴스(§2.5)·종료 동작 확인
 
@@ -77,4 +76,4 @@ manifest.join("CrSDK_Win") // ← 실제 압축 해제한 Windows SDK 폴더명/
 
 ---
 
-**현재 브랜치 상태**: 플랫폼 의존 4곳 cfg 격리 완료(USB억제기·단일인스턴스·브라우저·build.rs). macOS 빌드/실행 검증됨. 남은 건 위 §2의 Windows 실측 5건 + 패키징.
+**현재 브랜치 상태**: Windows에서 **빌드+실행+SDK init+웹서빙 검증 완료**(실측 머신). 코드 포팅 사실상 종료. 남은 건 (a) 실 A7C live 테스트(§3.3~3.5, §2.3 인코딩 확인), (b) 단일 인스턴스 named mutex(§2.5, 선택), (c) 패키징(§4)·README(§5)·main merge.
