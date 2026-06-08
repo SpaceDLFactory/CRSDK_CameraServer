@@ -1211,6 +1211,8 @@ async fn main() {
 
     // USB 간섭 억제 시작 — main 수명 동안 유지 (graceful shutdown 시 Drop이 회수)
     let _killer = UsbInterferenceSuppressor::start();
+    // 억제기가 None인 건 macOS에서만 "실패"다. 다른 OS는 ptpcamerad가 없어 no-op(정상).
+    #[cfg(target_os = "macos")]
     if _killer.is_none() {
         tracing::warn!("ptpcamerad suppressor failed to start — connect may time out");
     }
@@ -1283,7 +1285,7 @@ async fn main() {
         .await
         .expect("bind 0.0.0.0:8080");
     tracing::info!("crsdk_server listening on http://0.0.0.0:8080");
-    tracing::info!("  on this Mac : http://localhost:8080/web/index.html");
+    tracing::info!("  on this PC  : http://localhost:8080/web/index.html");
     if let Some(ip) = lan_ip() {
         tracing::info!("  on a phone  : http://{ip}:8080/web/index.html  (same Wi-Fi)");
     }
