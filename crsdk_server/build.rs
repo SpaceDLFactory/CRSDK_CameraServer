@@ -8,15 +8,19 @@ use std::env;
 use std::path::PathBuf;
 
 fn main() {
-    let manifest = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
-    // crsdk_server 는 crsdk 한 단계 아래 → SDK lib 는 ../CrSDK_.../external/crsdk
-    let sdk_lib = manifest
-        .parent()
-        .expect("crsdk_server has no parent dir")
-        .join("CrSDK_v2.01.00_20260203a_Mac/RemoteCli/external/crsdk");
-
-    assert!(sdk_lib.exists(), "SDK lib dir not found: {sdk_lib:?}");
-
-    println!("cargo:rustc-link-arg=-rpath");
-    println!("cargo:rustc-link-arg={}", sdk_lib.display());
+    // rpath는 Mach-O/ELF 전용(macOS). Windows는 rpath 개념이 없고(DLL은 exe 옆/PATH),
+    // 링크용 search/lib 지시는 crsdk lib의 build.rs가 emit해 다운스트림에 전파되므로
+    // 여기선 아무것도 안 해도 된다.
+    let is_windows = env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows");
+    if !is_windows {
+        let manifest = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
+        // crsdk_server 는 crsdk 한 단계 아래 → SDK lib 는 ../CrSDK_.../external/crsdk
+        let sdk_lib = manifest
+            .parent()
+            .expect("crsdk_server has no parent dir")
+            .join("CrSDK_v2.01.00_20260203a_Mac/RemoteCli/external/crsdk");
+        assert!(sdk_lib.exists(), "SDK lib dir not found: {sdk_lib:?}");
+        println!("cargo:rustc-link-arg=-rpath");
+        println!("cargo:rustc-link-arg={}", sdk_lib.display());
+    }
 }
