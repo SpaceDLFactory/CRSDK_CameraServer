@@ -530,9 +530,9 @@ int32_t get_device_properties(int64_t           handle,
                     uint64_t v = 0;
                     switch (esz) {
                         case 1: v = raw[j]; break;
-                        case 2: { uint16_t t; __builtin_memcpy(&t, raw + j * 2, 2); v = t; } break;
-                        case 4: { uint32_t t; __builtin_memcpy(&t, raw + j * 4, 4); v = t; } break;
-                        default: __builtin_memcpy(&v, raw + j * 8, 8); break;
+                        case 2: { uint16_t t; memcpy(&t, raw + j * 2, 2); v = t; } break;
+                        case 4: { uint32_t t; memcpy(&t, raw + j * 4, 4); v = t; } break;
+                        default: memcpy(&v, raw + j * 8, 8); break;
                     }
                     flat[i].allowed_values[j] = v;
                 }
@@ -669,9 +669,9 @@ int32_t get_control_code_info(int64_t handle, uint32_t code, CrControlInfoSimple
             uint64_t v = 0;
             switch (esz) {
                 case 1: v = raw[i]; break;
-                case 2: { uint16_t t; __builtin_memcpy(&t, raw + i * 2, 2); v = t; } break;
-                case 4: { uint32_t t; __builtin_memcpy(&t, raw + i * 4, 4); v = t; } break;
-                default: __builtin_memcpy(&v, raw + i * 8, 8); break;
+                case 2: { uint16_t t; memcpy(&t, raw + i * 2, 2); v = t; } break;
+                case 4: { uint32_t t; memcpy(&t, raw + i * 4, 4); v = t; } break;
+                default: memcpy(&v, raw + i * 8, 8); break;
             }
             out->values[i] = v;
         }
