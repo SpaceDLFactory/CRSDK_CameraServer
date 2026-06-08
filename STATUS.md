@@ -1,6 +1,9 @@
 # STATUS — CrSDK 테더링 서버 기능 현황
 
-최종 갱신: 2026-06-03 (v0.2.0). 구조 상세는 `ARCHITECTURE.md`, 로드맵은 `PLAN.md` 참조.
+최종 갱신: 2026-06-08. 구조 상세는 `ARCHITECTURE.md`, 로드맵은 `PLAN.md` 참조.
+
+**v0.2.4** (프로젝트명 **TetherMoon** + 달 앱 아이콘): 단일 인스턴스, 폰 접속 LAN URL, 에이전트 앱(Dock 바운스 제거)+종료 버튼, 앱 내 연결 안내, 다국어(en/ko/ja).
+**이후 UX**: MF Near/Far 버튼+W/S 단축키, 탭-투-포커스+AF D-pad/방향키, 조합형 그리드(3분할·소실점·대각선).
 
 **v0.2.0 주요 변경**: 바디 추상화(capability 레이어 + `/api/capabilities` + 프론트 큐레이션), AF 영역 모드 전체(와이드/존/중앙/플렉서블/트래킹) + 회전 그리드·AF 클릭 회전 리맵, 히스토그램·그리드 토글·100% 루페·필름스트립, 플래시 모드, WB AWB 수정, 해상도·켈빈 범위 카메라 로드, **다중 클라이언트 라이브뷰**(broadcast fan-out), graceful shutdown 보강(스트리밍 연결 좀비 방지), 실행 시 브라우저 자동 오픈.
 
@@ -26,8 +29,8 @@
 | `POST /api/shutter/down` `/up` | press-hold 연사 |
 | `POST /api/movie/start` `/stop` | 동영상 녹화 토글 |
 | `POST /api/cancel` | 촬영 취소 |
-| `POST /api/focus_nearfar {step}` + `GET /info` | MF 초점 이동(NearFar), 범위는 카메라가 제공 |
-| `POST /api/af_point {x,y}` | AF 영역 좌표 (정규화→패킹, 기본 중앙) |
+| `POST /api/focus_nearfar {step}` + `GET /info` | MF 초점 상대 이동(Near/Far 버튼·W/S가 반복 호출) |
+| `POST /api/af_point {x,y,area}` | AF 영역 좌표+모드 (탭-투-포커스/D-pad가 호출, 정규화→패킹) |
 | `POST /api/savepath {path,prefix}` | PC 저장 폴더 + 파일명 접두사 |
 | `GET /api/last_image` | 마지막 PC 저장 이미지 (미리보기) |
 | `GET /events` (SSE) | DownloadComplete·PropertyChanged·Disconnected·Error |
@@ -54,9 +57,9 @@
 - ✅ **부정확/쓰레기 값 필터** — 디코더가 매핑 실패한 SDK 패딩·쓰레기값을 dropdown에서 제외 (drive/iso/조리개/셔터 실데이터 검증 완료)
 
 ### 포커스
-- ✅ MF/AF 모드 + **NearFar 슬라이더**(카메라가 min/max/step 제공, ±7)
+- ✅ MF/AF 모드 + **MF 초점 Near/Far 버튼**(누르고 유지=연속 이동, 떼면 정지) + **W=Far/S=Near 단축키**. (이전 NearFar 슬라이더는 드래그-놓기 1회라 불편 → 버튼식으로 교체)
 - ✅ AF 셔터(S1 시퀀스)
-- ✅ **AF 포인트 지정** (LiveView 클릭, 기본 중앙) — 좌표 인코딩은 추정값, 하드웨어 미검증
+- ✅ **탭-투-포커스** — 라이브뷰 어디든 클릭=그 지점에 초점영역 배치(카메라 터치 포커스). 위치 지정 모드(존·플렉서블·확장·트래킹)는 그대로 이동, 와이드/중앙 등 고정 모드는 Flexible Spot M으로 전환해 배치. **AF D-pad(↑↓←→)+방향키**로 미세 이동(누르고 유지 반복). 클릭/D-pad/방향키가 한 화면 위치(`placeAf`) 공유 → 미회전 센서 좌표로 변환 전송
 
 ### 촬영
 - ✅ 단발 / **연사**(press-hold) / 동영상 녹화 토글 / 촬영 취소
@@ -97,7 +100,7 @@
 - 🚫 A7C 미지원 확인됨(덤프 대조): RAW압축(0x0131), Creative Look(0x01C5) — 둘 다 카메라가 property 자체를 노출 안 함. SDK에 Creative Style 대체 property 없음. ✅ WB AWB(0) 0-필터 버그 수정: `fillSelect(selWb,...,allowZero=true)`로 현재값이 AWB 아니어도 드롭다운에 노출 (벌브·PP Off와 동일 처리). 검증: 하드웨어(WB allowed에 0 포함 확인)
 
 ### Tier 3 — 뷰·편의
-- ✅ **그리드 토글** — 라이브뷰 우상단 ▦ 버튼, 3분할 그리드 on/off(기본 ON, `.lv-thirds` display)
+- ✅ **조합형 그리드** — 라이브뷰 우상단 ▦ → 메뉴에서 **3분할·소실점(중앙 방사+수평/수직)·대각선(코너 X)** 을 각각 독립 토글(동시 표시 가능). SVG 오버레이, 라이브뷰와 동반 회전. 선은 흰색+검은 외곽(밝은 장면 가시성). (주의: SVG는 CSS `display:none` 기본이라 JS에서 `'block'` 명시 — `''`면 다시 숨겨지는 함정)
 - ✅ **히스토그램** — 우측 패널 카드(라이브뷰 위 오버레이 X, 어두운 장면 시인성). 라이브뷰 프레임 240×160 다운샘플 → RGB 256-bin, 가산합성(lighter) 렌더, setInterval ~8fps, 피킹과 별도 캔버스. 미검증: 하드웨어(라이브뷰 피드 필요)
 - ✅ **100% 확대 초점확인** — 라이브뷰 우상단 🔍 토글, 루페 캔버스가 lvImg 원본 픽셀을 1:1 크롭 표시(MF 정밀초점). 줌 모드 클릭=확대 지점 선택(AF 아님), 회전은 applyRot 동일 변환. CSS transform과 분리(별도 캔버스). 미검증: 하드웨어
 - ✅ **필름스트립** — 우측 Recent 카드, download_complete마다 `/api/last_image` 즉시 로드→캔버스 다운스케일 dataURL 누적(서버는 최신 1장만 기억하나 로드된 픽셀 보존, 최대 12장). RAW는 onerror 스킵, 썸네일 클릭=미리보기 확대. 서버 무변경. 미검증: 하드웨어
