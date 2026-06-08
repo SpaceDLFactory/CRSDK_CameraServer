@@ -41,9 +41,16 @@ use tower_http::services::ServeDir;
 // 일회성 kill로는 connect 핸드셰이크(최대 10s) 윈도우를 못 버틴다.
 // 50ms 주기 kill loop를 백그라운드 자식 프로세스로 돌리고, Drop이 회수한다.
 // (crsdk_example의 UsbInterferenceSuppressor와 동일 — 추후 lib로 통합 가능)
-struct UsbInterferenceSuppressor(std::process::Child);
+// ptpcamerad는 macOS 전용 이슈. 다른 OS는 USB 선점 메커니즘이 달라(Windows: WinUSB/libusb
+// 드라이버) 여기선 no-op. (cross-platform 구조화 — Windows 측 처리는 추후 결정)
+#[allow(dead_code)]
+struct UsbInterferenceSuppressor {
+    #[cfg(target_os = "macos")]
+    child: std::process::Child,
+}
 
 impl UsbInterferenceSuppressor {
+    #[cfg(target_os = "macos")]
     fn start() -> Option<Self> {
         let _ = std::process::Command::new("pkill")
             .args(["-KILL", "ptpcamerad"])
@@ -64,14 +71,20 @@ impl UsbInterferenceSuppressor {
             .stderr(std::process::Stdio::null())
             .spawn()
             .ok()?;
-        Some(Self(child))
+        Some(Self { child })
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    fn start() -> Option<Self> {
+        None // TODO(windows): USB 드라이버/억제가 필요한지 실측 후 결정
     }
 }
 
+#[cfg(target_os = "macos")]
 impl Drop for UsbInterferenceSuppressor {
     fn drop(&mut self) {
-        let _ = self.0.kill();
-        let _ = self.0.wait();
+        let _ = self.child.kill();
+        let _ = self.child.wait();
     }
 }
 
@@ -1138,7 +1151,8 @@ async fn quit(State(s): State<AppState>) -> impl IntoResponse {
     "bye"
 }
 
-/// 자기 자신을 제외한, 같은 이름(crsdk_server)의 실행 중 인스턴스 PID들.
+/// 자기 자신을 제외한, 같은 이름(crsdk_server)의 실행 중 인스턴스 PID들. (unix: pgrep)
+#[cfg(unix)]
 fn other_instance_pids() -> Vec<u32> {
     let me = std::process::id();
     std::process::Command::new("pgrep")
@@ -1158,6 +1172,7 @@ fn other_instance_pids() -> Vec<u32> {
 /// ConnectTimeout(0x8208)이 나므로, 일반 사용자가 앱을 여러 번 켜도 단일 인스턴스가
 /// 되도록 한다. 먼저 SIGTERM(기존 인스턴스의 graceful shutdown → 카메라 해제)을 보내고,
 /// 종료를 기다린 뒤 남으면 SIGKILL.
+#[cfg(unix)]
 fn terminate_other_instances() {
     let pids = other_instance_pids();
     if pids.is_empty() {
@@ -1177,6 +1192,12 @@ fn terminate_other_instances() {
         let _ = std::process::Command::new("kill").args(["-9", &p.to_string()]).status();
     }
     std::thread::sleep(Duration::from_millis(300)); // 포트/카메라 해제 여유
+}
+
+/// 비-unix(Windows 등): 단일 인스턴스 보장을 별도 메커니즘으로 해야 함.
+#[cfg(not(unix))]
+fn terminate_other_instances() {
+    // TODO(windows): named mutex(권장) 또는 tasklist/taskkill로 기존 인스턴스 종료
 }
 
 #[tokio::main]
@@ -1267,13 +1288,16 @@ async fn main() {
         tracing::info!("  on a phone  : http://{ip}:8080/web/index.html  (same Wi-Fi)");
     }
 
-    // 실행 시 기본 브라우저로 UI를 띄운다(.app 더블클릭 UX). 개발/테스트 중 매 재시작마다
+    // 실행 시 기본 브라우저로 UI를 띄운다(더블클릭 UX). 개발/테스트 중 매 재시작마다
     // 탭이 열리는 걸 막으려면 CRSDK_NO_BROWSER=1.
-    #[cfg(target_os = "macos")]
     if std::env::var_os("CRSDK_NO_BROWSER").is_none() {
-        let _ = std::process::Command::new("open")
-            .arg("http://localhost:8080/web/index.html")
-            .spawn();
+        const URL: &str = "http://localhost:8080/web/index.html";
+        #[cfg(target_os = "macos")]
+        let _ = std::process::Command::new("open").arg(URL).spawn();
+        #[cfg(target_os = "windows")]
+        let _ = std::process::Command::new("cmd").args(["/C", "start", "", URL]).spawn();
+        #[cfg(all(unix, not(target_os = "macos")))]
+        let _ = std::process::Command::new("xdg-open").arg(URL).spawn(); // Linux 등
     }
 
     axum::serve(listener, app)

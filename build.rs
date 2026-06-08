@@ -3,14 +3,18 @@ use std::path::PathBuf;
 
 fn main() {
     let manifest = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
+    // 타깃 OS (build.rs는 호스트에서 돌지만 cargo가 타깃을 env로 준다)
+    let is_windows = env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows");
 
-    // SDK headers live here (CameraRemote_SDK.h, IDeviceCallback.h, ...)
-    let sdk_include = manifest
-        .join("CrSDK_v2.01.00_20260203a_Mac/RemoteCli/app/CRSDK");
-
-    // SDK dylib lives here (libCr_Core.dylib, ...)
-    let sdk_lib = manifest
-        .join("CrSDK_v2.01.00_20260203a_Mac/RemoteCli/external/crsdk");
+    // SDK 루트 — OS별 폴더. Windows SDK는 별도 다운로드(폴더명은 Windows 세션에서 확정).
+    let sdk_root = if is_windows {
+        manifest.join("CrSDK_Win") // TODO(windows): 실제 Windows SDK 압축 해제 경로로
+    } else {
+        manifest.join("CrSDK_v2.01.00_20260203a_Mac")
+    };
+    // SDK headers (CameraRemote_SDK.h, ...) / lib (libCr_Core.dylib · Cr_Core.lib)
+    let sdk_include = sdk_root.join("RemoteCli/app/CRSDK");
+    let sdk_lib = sdk_root.join("RemoteCli/external/crsdk");
 
     // Wrapper sources
     let wrapper_dir = manifest.join("wrapper");
@@ -23,25 +27,25 @@ fn main() {
     assert!(wrapper_cpp.exists(), "wrapper.cpp not found");
 
     // Compile wrapper.cpp → libwrapper.a
-    cc::Build::new()
-        .cpp(true)
-        .std("c++17")
-        .flag("-fno-rtti")
-        .flag("-fno-exceptions")
-        .include(&sdk_include)
-        .file(&wrapper_cpp)
-        .compile("wrapper");
+    let mut build = cc::Build::new();
+    build.cpp(true).std("c++17").include(&sdk_include).file(&wrapper_cpp);
+    if is_windows {
+        build.flag_if_supported("/GR-"); // MSVC: RTTI off (예외 끄기는 SDK 헤더 의존 — 추후 실측)
+    } else {
+        build.flag("-fno-rtti").flag("-fno-exceptions"); // Clang/GCC
+    }
+    build.compile("wrapper");
 
-    // Link the Sony SDK dynamic library
+    // Link the Sony SDK library (macOS: libCr_Core.dylib / Windows: Cr_Core.lib→Cr_Core.dll)
     println!("cargo:rustc-link-search=native={}", sdk_lib.display());
     println!("cargo:rustc-link-lib=dylib=Cr_Core");
 
-    // Embed the dylib directory as an rpath so dyld can find libCr_Core.dylib
-    // at runtime without requiring DYLD_LIBRARY_PATH to be set manually.
-    // The path is absolute and machine-specific, which is fine for a local
-    // development binary.
-    println!("cargo:rustc-link-arg=-rpath");
-    println!("cargo:rustc-link-arg={}", sdk_lib.display());
+    // rpath는 ELF/Mach-O 전용. macOS는 dylib 디렉터리를 rpath로 박아 DYLD_LIBRARY_PATH 없이
+    // 찾게 한다. Windows엔 rpath 개념이 없어(DLL은 exe 옆/PATH) 건너뛴다.
+    if !is_windows {
+        println!("cargo:rustc-link-arg=-rpath");
+        println!("cargo:rustc-link-arg={}", sdk_lib.display());
+    }
 
     // Re-run if wrapper sources change
     println!("cargo:rerun-if-changed=wrapper/wrapper.h");
@@ -58,6 +62,9 @@ fn main() {
     //
     // We create a symlink from that path to the actual CrAdapter directory.
     // OUT_DIR is target/debug/build/crsdk-<hash>/out  → go up 3 levels = target/debug/
+    // (macOS/unix 전용 — std::os::unix::symlink. Windows는 NSBundle이 없고 플러그인 lookup
+    //  규칙이 달라 별도 처리 필요.)
+    #[cfg(unix)]
     {
         let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
         // OUT_DIR: <profile>/build/<crate>-<hash>/out → ancestor(3) = <profile dir>
@@ -72,6 +79,12 @@ fn main() {
                 println!("cargo:warning=Created CrAdapter symlink: {adapter_link:?}");
             }
         }
+    }
+    // TODO(windows): CrAdapter DLL(Cr_PTP_USB.dll 등)을 exe 옆에 복사. SDK의 Windows 플러그인
+    // lookup 규칙(exe 기준 CrAdapter/ 인지 등)을 실측 후 확정.
+    #[cfg(windows)]
+    {
+        let _ = &sdk_lib; // (Windows 세션에서 구현)
     }
 
     // Generate Rust FFI bindings from wrapper.h
