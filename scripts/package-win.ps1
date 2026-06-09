@@ -41,6 +41,15 @@ Copy-Item (Join-Path $root "crsdk_server\web") (Join-Path $stage "web") -Recurse
 $drv = Join-Path $root "winusb_driver"
 if (Test-Path $drv) {
     Copy-Item $drv (Join-Path $stage "driver") -Recurse
+    # 인스톨러가 TrustedPublisher 에 등록하도록 Sony 코드서명 인증서를 .cat 에서 추출
+    $cat = Join-Path $stage "driver\srcameradriver.cat"
+    if (Test-Path $cat) {
+        $sig = Get-AuthenticodeSignature $cat
+        if ($sig.SignerCertificate) {
+            [IO.File]::WriteAllBytes((Join-Path $stage "driver\sony_codesign.cer"),
+                                     $sig.SignerCertificate.Export("Cert"))
+        }
+    }
 } else {
     Write-Warning "winusb_driver\ 없음 — 드라이버는 패키지에서 제외됨(README 안내만 포함)"
 }
