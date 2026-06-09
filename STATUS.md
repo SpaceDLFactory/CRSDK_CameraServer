@@ -126,6 +126,16 @@ cargo run -p crsdk_server     # http://localhost:8080/web/index.html
 ```
 (clang 21 시스템 Xcode 사용 시 SDKROOT 불필요)
 
+### 6.1 Windows 지원 (`windows-prep` 브랜치 — 단일 코드베이스, cfg 분기)
+
+한 소스로 macOS/Windows 양쪽 빌드. 실 A7C로 **빌드+연결+모델명/저장경로 검증 완료**. 상세·체크리스트는 `docs/WINDOWS-PORT.md`.
+
+- **빌드 요건**: Rust msvc, VS Build Tools(MSVC+Win SDK), LLVM(`set "LIBCLANG_PATH=...\LLVM\bin"` — 따옴표 필수), Windows용 CrSDK(`CrSDK_Win/`). `cargo build -p crsdk_server`.
+- **DLL**: `Cr_Core.dll`·`CrAdapter\*.dll`을 build.rs가 exe 옆에 자동 복사(rpath 없음).
+- **문자열**: Windows `Cr_Core.dll`은 UNICODE 빌드 → `CrChar*`가 UTF-16. wrapper에서 `#if _WIN32`로 UTF-16↔UTF-8 변환(모델명/저장경로). macOS(UTF-8) 무변경.
+- ⚠️ **libusbK 디바이스 드라이버(사용자 1회 설치, 필수)**: macOS와 달리 Windows는 CrSDK가 libusb로 카메라를 잡으려면 Sony 동봉 **libusbK 드라이버**(`Driver.zip`/`srcameradriver.inf`)를 카메라 USB 인터페이스에 바인딩해야 함(없으면 기본 MTP 드라이버라 `enum=0`). 장치관리자 → 드라이버 업데이트 → **디스크 있음** → `srcameradriver.inf` → "install anyway"(Secure Boot off). 카메라는 **USB 원격(PC Remote) ON**.
+- **운영 교훈**: 서버 종료는 `/api/quit`(graceful). 강제 종료 시 카메라 PC Remote 세션이 매달려 재연결 ConnectTimeout → USB 재연결 필요.
+
 ## 7. 바디 추상화 설계 (다음 작업 — capability 레이어)
 
 **동기**: A7C 미지원 분기가 산발(null 체크), AF 보정표·좌표범위가 A7C 하드코딩, 프론트 드롭다운 큐레이션 부재. 멀티바디·오픈소스 위해 정리.
