@@ -477,13 +477,24 @@ async fn set_save_path(
 }
 
 /// 저장 폴더를 OS 네이티브 폴더 선택창으로 고른다(서버=PC 쪽에 창이 뜸).
+/// 다이얼로그는 서버의 현재 save_path 에서 열린다(TM_INITDIR 환경변수 주입 — 이스케이프 회피).
 /// 고른 절대경로를 반환만 하고 적용은 UI가 /api/savepath 로. 취소 시 204.
-async fn browse_save_path() -> impl IntoResponse {
-    let res = tokio::task::spawn_blocking(|| -> Option<String> {
+async fn browse_save_path(State(s): State<AppState>) -> impl IntoResponse {
+    let init = s.save_path.lock().await.clone();
+    let res = tokio::task::spawn_blocking(move || -> Option<String> {
         #[cfg(target_os = "macos")]
         {
+            // 현재 경로가 있으면 거기서 열기(default location), 없으면 기본.
             let out = std::process::Command::new("osascript")
-                .args(["-e", "POSIX path of (choose folder with prompt \"TetherMoon: 저장 폴더 선택\")"])
+                .env("TM_INITDIR", &init)
+                .args([
+                    "-e", "set d to system attribute \"TM_INITDIR\"",
+                    "-e", "if d is \"\" then",
+                    "-e", "  POSIX path of (choose folder with prompt \"TetherMoon: 저장 폴더 선택\")",
+                    "-e", "else",
+                    "-e", "  POSIX path of (choose folder with prompt \"TetherMoon: 저장 폴더 선택\" default location (POSIX file d))",
+                    "-e", "end if",
+                ])
                 .output().ok()?;
             if !out.status.success() { return None; } // 취소 시 non-zero
             let p = String::from_utf8_lossy(&out.stdout).trim().to_string();
@@ -492,19 +503,22 @@ async fn browse_save_path() -> impl IntoResponse {
         #[cfg(target_os = "windows")]
         {
             // FolderBrowserDialog는 STA 필요. 한글 경로 위해 출력 UTF-8 강제.
+            // 현재 경로는 $env:TM_INITDIR 로 받아 SelectedPath 초기값으로(거기서 열림).
             let script = "[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; \
                 Add-Type -AssemblyName System.Windows.Forms; \
                 $d=New-Object System.Windows.Forms.FolderBrowserDialog; \
                 $d.Description='TetherMoon save folder'; \
+                if($env:TM_INITDIR -and (Test-Path $env:TM_INITDIR)){ $d.SelectedPath=$env:TM_INITDIR }; \
                 if($d.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK){[Console]::Out.Write($d.SelectedPath)}";
             let out = std::process::Command::new("powershell")
+                .env("TM_INITDIR", &init)
                 .args(["-NoProfile", "-STA", "-Command", script])
                 .output().ok()?;
             let p = String::from_utf8_lossy(&out.stdout).trim().to_string();
             if p.is_empty() { None } else { Some(p) }
         }
         #[cfg(not(any(target_os = "macos", target_os = "windows")))]
-        { None }
+        { let _ = init; None }
     }).await;
 
     match res {
