@@ -21,6 +21,10 @@
 #include <cstring>  // strlen
 #include <vector>   // UTF-8 → UTF-16 conversion
 #include <atomic>   // std::atomic for thread-safe callback deactivation
+#include <string>   // UTF-16 ↔ UTF-8 변환 버퍼 (Windows)
+#if defined(_WIN32)
+#include <windows.h> // WideCharToMultiByte / MultiByteToWideChar
+#endif
 
 using namespace SCRSDK;
 
@@ -170,11 +174,33 @@ void enum_release(void* handle)
  * Camera info accessors
  * ------------------------------------------------------------------ */
 
+#if defined(_WIN32)
+// Windows의 Cr_Core.dll은 UNICODE 빌드라 CrChar* 문자열이 실제로는 UTF-16다.
+// 우리 래퍼는 UNICODE 미정의(CrChar=char)로 컴파일되므로, 받은 포인터를 wchar_t*로
+// 재해석해 UTF-8로 변환한다. read_cchar(Rust)가 호출 직후 즉시 복사하므로 thread_local 재사용 안전.
+static const char* w_to_utf8(const char* cr)
+{
+    thread_local std::string buf;
+    if (!cr) { buf.clear(); return nullptr; }
+    const wchar_t* ws = reinterpret_cast<const wchar_t*>(cr);
+    int n = WideCharToMultiByte(CP_UTF8, 0, ws, -1, nullptr, 0, nullptr, nullptr);
+    if (n <= 1) { buf.clear(); return buf.c_str(); }
+    buf.assign(static_cast<size_t>(n - 1), '\0');
+    WideCharToMultiByte(CP_UTF8, 0, ws, -1, &buf[0], n, nullptr, nullptr);
+    return buf.c_str();
+}
+#endif
+
 const char* camera_get_name_ptr(const void* cam_ptr)
 {
     const auto* c =
         static_cast<const ICrCameraObjectInfo*>(cam_ptr);
-    return c ? c->GetName() : nullptr;
+    if (!c) return nullptr;
+#if defined(_WIN32)
+    return w_to_utf8(c->GetName());
+#else
+    return c->GetName();
+#endif
 }
 
 uint32_t camera_get_name_size(const void* cam_ptr)
@@ -188,7 +214,12 @@ const char* camera_get_model_ptr(const void* cam_ptr)
 {
     const auto* c =
         static_cast<const ICrCameraObjectInfo*>(cam_ptr);
-    return c ? c->GetModel() : nullptr;
+    if (!c) return nullptr;
+#if defined(_WIN32)
+    return w_to_utf8(c->GetModel());
+#else
+    return c->GetModel();
+#endif
 }
 
 uint32_t camera_get_model_size(const void* cam_ptr)
@@ -224,7 +255,12 @@ const char* camera_get_connection_type_name_ptr(const void* cam_ptr)
 {
     const auto* c =
         static_cast<const ICrCameraObjectInfo*>(cam_ptr);
-    return c ? reinterpret_cast<const char*>(c->GetConnectionTypeName()) : nullptr;
+    if (!c) return nullptr;
+#if defined(_WIN32)
+    return w_to_utf8(reinterpret_cast<const char*>(c->GetConnectionTypeName()));
+#else
+    return reinterpret_cast<const char*>(c->GetConnectionTypeName());
+#endif
 }
 
 uint32_t camera_get_fingerprint(const void* cam_ptr, char* buf, uint32_t buf_size)
@@ -619,11 +655,30 @@ int32_t set_device_setting(int64_t handle, uint32_t key,
 int32_t set_save_info(int64_t handle, const char* path,
                        const char* prefix, int32_t no)
 {
+#if defined(_WIN32)
+    // DLL은 CrChar=wchar_t를 기대하므로 UTF-8(char*) → UTF-16(wchar_t*) 변환 후 전달.
+    auto to_w = [](const char* s) -> std::wstring {
+        if (!s) return std::wstring();
+        int n = MultiByteToWideChar(CP_UTF8, 0, s, -1, nullptr, 0);
+        if (n <= 1) return std::wstring();
+        std::wstring w(static_cast<size_t>(n - 1), L'\0');
+        MultiByteToWideChar(CP_UTF8, 0, s, -1, &w[0], n);
+        return w;
+    };
+    std::wstring wpath = to_w(path);
+    std::wstring wprefix = to_w(prefix);
+    return static_cast<int32_t>(
+        SetSaveInfo(to_handle(handle),
+                    reinterpret_cast<CrChar*>(const_cast<wchar_t*>(wpath.c_str())),
+                    reinterpret_cast<CrChar*>(const_cast<wchar_t*>(wprefix.c_str())),
+                    static_cast<CrInt32>(no)));
+#else
     return static_cast<int32_t>(
         SetSaveInfo(to_handle(handle),
                     const_cast<CrChar*>(path),
                     const_cast<CrChar*>(prefix),
                     static_cast<CrInt32>(no)));
+#endif
 }
 
 int32_t execute_control_code_value(int64_t handle, uint32_t code, uint64_t value)
