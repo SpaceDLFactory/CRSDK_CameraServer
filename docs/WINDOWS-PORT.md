@@ -39,9 +39,13 @@ git checkout windows-prep
 ### 2.2 CrAdapter 플러그인 배치 — `build.rs` `#[cfg(windows)]` ✅ 완료
 - OUT_DIR에서 `target\<profile>` 파생 → top-level `*.dll`(Cr_Core, monitor_protocol*)은 exe 옆에, `CrAdapter\*.dll`(Cr_PTP_USB/IP, libssh2, libusb-1.0)은 exe 옆 `CrAdapter\`로 **복사**. (절대 하드코딩 경로 없음.)
 
-### 2.3 CrChar(문자열) 인코딩 — ⚠️ **live 카메라로 실측 필요**
-- **정정**: `CrTypes.h`의 `CrChar = wchar_t`는 **`UNICODE`/`_UNICODE` 매크로가 정의됐을 때만**. cc-rs(cl.exe)는 이를 정의하지 않으므로 우리 빌드에선 `CrChar = char`(CrAChar) → `GetName()`/`GetModel()`이 `const char*`로 컴파일됨(= macOS와 동일, 변환 불필요).
-- **남은 위험**: 정작 사전컴파일된 `Cr_Core.dll`이 UNICODE(wchar) 빌드라면, DLL이 돌려주는 버퍼는 UTF-16인데 우리는 char로 읽어 깨질 수 있음("I\0L\0C\0E\0…" 형태). → **실카메라로 모델명 확인**해서 정상이면 끝, 깨지면 wrapper에서 `UNICODE` 정의 + `WideCharToMultiByte` 변환으로 전환.
+### 2.3 CrChar(문자열) 인코딩 — ✅ **해결(실측 확인)**
+- 사전컴파일된 `Cr_Core.dll`은 **UNICODE 빌드**라 `CrChar*` 문자열이 실제로는 UTF-16였음. 우리 래퍼는 `UNICODE` 미정의(`CrChar=char`)라 모델명이 `"ILCE-7C"`→`"I"`로 잘리고 `set_save_info`가 33036 실패했음.
+- **수정**(`wrapper.cpp`, `#if defined(_WIN32)`): UNICODE는 정의하지 않고 포인터만 재해석.
+  - 반환 문자열(name/model/connection type): `wchar_t*`로 재해석 → `WideCharToMultiByte`로 UTF-8 변환(thread_local 버퍼, Rust가 즉시 복사).
+  - SDK로 넘기는 문자열(`set_save_info` path/prefix): `MultiByteToWideChar`로 UTF-8→UTF-16 후 전달.
+  - `get_property_string`은 이미 `GetCurrentStr()`의 `CrInt16u*`를 직접 UTF-16으로 읽어 처리 → 변경 불필요.
+- macOS 경로(`CrChar=char`, UTF-8)는 무변경. 실측: `"model":"ILCE-7C"`, `save path set: ...\captures` 정상 확인.
 
 ### 2.4 USB 억제기 — `main.rs` 비-macOS no-op ✅ (유지)
 - macOS의 ptpcamerad 억제는 Windows에 없음 → no-op 유지. WARN 로그는 macOS에서만 뜨도록 cfg 게이팅함.
@@ -56,13 +60,19 @@ git checkout windows-prep
 - cc 플래그: MSVC `/GR-` 분기 ✅ (예외 끄기는 SDK 헤더가 예외 쓰면 빼야 할 수 있음 — 빌드 에러 시 조정)
 - rpath: Windows는 건너뜀 ✅ → DLL은 exe 옆/PATH
 
+### 2.7 libusbK 디바이스 드라이버 — ⚠️ **사용자 1회 설치(코드 아님)**
+- **macOS는 불필요**하지만 **Windows는 필수**: CrSDK가 libusb로 카메라를 잡으려면 Windows 기본 MTP(`WUDFWpdMtp`) 대신 Sony가 SDK에 동봉한 **libusbK 드라이버**(`Driver.zip` → `srcameradriver.inf`)가 카메라 USB 인터페이스에 바인딩돼야 함. 안 깔면 `enum=0`.
+- INF가 카메라 VID/PID에 매칭(A7C = `VID_054C&PID_0D2B`). 서명은 `CN=Sony Corporation`(DigiCert)로 Valid이나, 퍼블리셔가 신뢰 저장소에 없어 `pnputil`은 거부됨. **장치관리자 → 드라이버 업데이트 → 디스크 있음(Have Disk) → srcameradriver.inf → "install anyway"** 로 설치(Secure Boot off면 로드됨). 성공 시 `libusbK Usb Devices / Sony Remote Control Camera`로 표시.
+- 카메라 쪽은 **USB 원격(PC Remote) ON** 상태여야 함(그러면 USB 연결모드 MTP/대용량 선택지는 회색이 되는데 정상).
+- 배포 README에 이 절차 명시 필요(드라이버 재배포 라이선스는 Sony 약관 확인 — 보통 사용자가 SDK/Imaging Edge에서 받게 안내).
+
 ---
 
 ## 3. 검증 순서 (매 단계 컴파일)
 1. [x] `cargo build -p crsdk_server` — 빌드 통과 (wrapper.cpp `__builtin_memcpy`→`memcpy`, `LIBCLANG_PATH` 따옴표 이슈 해결)
 2. [x] 실행 → `Cr_Core.dll`·`CrAdapter\*.dll` 자동 복사·로드, SDK init OK, 8080 리슨, 웹 UI 서빙
-3. [ ] **카메라 USB(PC Remote) 연결** → enum 발견 + 모델명 안 깨지는지(§2.3) 확인
-4. [ ] 연결·라이브뷰·촬영 스모크 테스트
+3. [x] **카메라 연결** → enum/connect OK, `"model":"ILCE-7C"` 정상, save path 설정 OK (§2.3 검증). ⚠️ **선결**: Windows는 Sony libusbK 드라이버(`Driver.zip`/§2.7) 설치 필요 + 카메라 USB 원격(PC Remote) ON
+4. [ ] 라이브뷰·촬영 스모크 테스트 (※ 서버 종료는 `/api/quit`로 graceful — force-kill하면 카메라 PC Remote 세션이 매달려 재연결 ConnectTimeout, USB 재연결 필요)
 5. [ ] 단일 인스턴스(§2.5)·종료 동작 확인
 
 ## 4. 패키징 (1차)
@@ -76,4 +86,4 @@ git checkout windows-prep
 
 ---
 
-**현재 브랜치 상태**: Windows에서 **빌드+실행+SDK init+웹서빙 검증 완료**(실측 머신). 코드 포팅 사실상 종료. 남은 건 (a) 실 A7C live 테스트(§3.3~3.5, §2.3 인코딩 확인), (b) 단일 인스턴스 named mutex(§2.5, 선택), (c) 패키징(§4)·README(§5)·main merge.
+**현재 브랜치 상태**: Windows에서 **빌드+실행+실 A7C 연결+모델명/저장경로(CrChar) 검증 완료**(실측 머신). 코드 포팅 핵심 종료. 남은 건 (a) 라이브뷰·촬영 스모크(§3.4), (b) 단일 인스턴스 named mutex(§2.5, 선택), (c) 패키징(§4)·README(§5, libusbK 드라이버 절차 포함)·main merge. ※ Windows 사용자 선결: libusbK 드라이버 설치(§2.7) + 카메라 PC Remote ON.
