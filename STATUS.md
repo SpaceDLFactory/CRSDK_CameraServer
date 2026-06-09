@@ -137,6 +137,7 @@ cargo run -p crsdk_server     # http://localhost:8080/web/index.html
 - **운영 교훈**: 서버 종료는 `/api/quit`(graceful). 강제 종료 시 카메라 PC Remote 세션이 매달려 재연결 ConnectTimeout → USB 재연결 필요.
 - **단일 인스턴스**: Windows는 named mutex(2번째 인스턴스는 그냥 종료, 기존이 카메라 유지). macOS는 기존 종료-후-교체.
 - **패키징**: `scripts\package-win.ps1` → `dist\TetherMoon-win-x64.zip`(exe+DLL+CrAdapter+web+driver+README). 실측: MF 셔터 → RAW PC 다운로드 확인.
+- **인스톨러**: `scripts\installer.iss`(Inno Setup) → `dist\TetherMoon-setup.exe`. 앱 설치 + libusbK 드라이버 자동 설치(인증서 TrustedPublisher 등록 + pnputil) + 바로가기/제거. 장치관리자 수동 단계 불필요.
 - **저장경로**: UI '찾아보기'(`/api/savepath/browse`)가 서버 PC의 OS 네이티브 폴더창을 띄움(mac osascript / win FolderBrowserDialog). 수동 경로 타이핑 불필요.
 
 ## 7. 바디 추상화 설계 (다음 작업 — capability 레이어)

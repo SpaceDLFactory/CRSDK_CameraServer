@@ -120,13 +120,19 @@ application**. `scripts/make_app.sh` packages a self-contained macOS app bundle
 Pre-built releases are attached to the [Releases](../../releases) page. First launch:
 right-click → Open, or `xattr -dr com.apple.quarantine "TetherMoon.app"`.
 
-On **Windows**, `scripts/package-win.ps1` assembles `dist/TetherMoon-win-x64.zip`
-(exe + SDK DLLs + `CrAdapter\` + `web\` + libusbK `driver\` + README):
+On **Windows**, build a one-click installer (`dist/TetherMoon-setup.exe`) that bundles
+the app and **auto-installs the libusbK driver** (no manual Device Manager step) via
+[Inno Setup](https://jrsoftware.org/isinfo.php):
 
 ```bat
 set "LIBCLANG_PATH=C:\Program Files\LLVM\bin"
-powershell -ExecutionPolicy Bypass -File scripts\package-win.ps1
+powershell -ExecutionPolicy Bypass -File scripts\package-win.ps1   :: stages files + zip
+iscc scripts\installer.iss                                         :: → dist\TetherMoon-setup.exe
 ```
+
+`package-win.ps1` alone also produces a portable `dist/TetherMoon-win-x64.zip`
+(exe + SDK DLLs + `CrAdapter\` + `web\` + libusbK `driver\` + README) if you prefer
+no installer.
 
 ## 🌙 First shot
 
