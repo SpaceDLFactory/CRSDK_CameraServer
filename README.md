@@ -86,6 +86,27 @@ cargo run -p crsdk_server        # → http://localhost:8080/web/index.html
 macOS's `ptpcamerad` daemon interferes with USB camera access; the server suppresses
 it on startup (this is expected behavior).
 
+### Windows
+
+Same codebase, cross-platform via `cfg`. Place the **Windows** SDK at the project root
+as `CrSDK_Win/` (so headers are at `CrSDK_Win/app/CRSDK`, libs at `CrSDK_Win/external/crsdk`).
+
+```bat
+:: Prerequisites: Rust (msvc), VS Build Tools (MSVC + Windows SDK), LLVM
+set "LIBCLANG_PATH=C:\Program Files\LLVM\bin"   :: quotes required (no trailing space)
+cargo run -p crsdk_server                        :: → http://localhost:8080/web/index.html
+```
+
+`build.rs` copies `Cr_Core.dll` + `CrAdapter\*.dll` next to the exe automatically (no rpath
+on Windows). The strings returned by the Windows DLL are UTF-16 and converted to UTF-8 in
+the FFI wrapper.
+
+> **One-time driver step (required):** Windows binds the camera to the generic MTP driver,
+> which the SDK's libusb cannot claim. Install Sony's bundled **libusbK** driver
+> (`Driver.zip` → `srcameradriver.inf`) via Device Manager → *Update driver* → *Have Disk*
+> → *Install anyway*, with the camera in **PC Remote** USB mode. Without it the server
+> reports `no cameras detected`. See [`docs/WINDOWS-PORT.md`](docs/WINDOWS-PORT.md) §2.7.
+
 ## Distribution (binary .app)
 
 The Sony license permits distributing the SDK library **embedded inside your
@@ -98,6 +119,14 @@ application**. `scripts/make_app.sh` packages a self-contained macOS app bundle
 
 Pre-built releases are attached to the [Releases](../../releases) page. First launch:
 right-click → Open, or `xattr -dr com.apple.quarantine "TetherMoon.app"`.
+
+On **Windows**, `scripts/package-win.ps1` assembles `dist/TetherMoon-win-x64.zip`
+(exe + SDK DLLs + `CrAdapter\` + `web\` + libusbK `driver\` + README):
+
+```bat
+set "LIBCLANG_PATH=C:\Program Files\LLVM\bin"
+powershell -ExecutionPolicy Bypass -File scripts\package-win.ps1
+```
 
 ## 🌙 First shot
 

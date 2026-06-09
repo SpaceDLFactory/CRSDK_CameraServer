@@ -1194,11 +1194,40 @@ fn terminate_other_instances() {
     std::thread::sleep(Duration::from_millis(300)); // 포트/카메라 해제 여유
 }
 
-/// 비-unix(Windows 등): 단일 인스턴스 보장을 별도 메커니즘으로 해야 함.
-#[cfg(not(unix))]
+/// Windows: named mutex로 2번째 인스턴스를 막는다(기존 인스턴스가 카메라를 유지).
+/// unix처럼 기존 인스턴스를 force-kill하면 카메라 PC Remote 세션이 매달려
+/// ConnectTimeout이 나므로, Windows에선 "두 번째가 그냥 종료" 하는 편이 안전하다.
+/// (뮤텍스 핸들은 CloseHandle 하지 않아 프로세스 수명 동안 유지되고, 종료 시 OS가 해제)
+#[cfg(windows)]
 fn terminate_other_instances() {
-    // TODO(windows): named mutex(권장) 또는 tasklist/taskkill로 기존 인스턴스 종료
+    use std::ffi::OsStr;
+    use std::os::windows::ffi::OsStrExt;
+    const ERROR_ALREADY_EXISTS: u32 = 183;
+    extern "system" {
+        fn CreateMutexW(attr: *const core::ffi::c_void, owner: i32, name: *const u16)
+            -> *mut core::ffi::c_void;
+        fn GetLastError() -> u32;
+    }
+    let name: Vec<u16> = OsStr::new("TetherMoon_crsdk_server_singleton")
+        .encode_wide()
+        .chain(std::iter::once(0))
+        .collect();
+    let handle = unsafe { CreateMutexW(std::ptr::null(), 0, name.as_ptr()) };
+    if handle.is_null() {
+        return; // 뮤텍스 생성 실패 — 막지 않고 진행
+    }
+    if unsafe { GetLastError() } == ERROR_ALREADY_EXISTS {
+        tracing::error!(
+            "another TetherMoon instance is already running — exiting (single-instance)"
+        );
+        std::process::exit(0);
+    }
+    // handle 의도적으로 닫지 않음(프로세스 수명 = 뮤텍스 수명)
 }
+
+/// 그 외 OS: no-op.
+#[cfg(not(any(unix, windows)))]
+fn terminate_other_instances() {}
 
 #[tokio::main]
 async fn main() {

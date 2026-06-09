@@ -1,5 +1,15 @@
 # Sony SDK (저작권 Sony — 재배포 금지, 사용자가 직접 배치)
 /CrSDK_v2.01.00_20260203a_Mac
+# Windows용 SDK 추출물 + libusbK 드라이버 (Sony 저작권 — 사용자가 직접 배치)
+/CrSDK_Win
+/winusb_driver
+/Driver.zip
+/RemoteCli.zip
+/SimpleCli.zip
+/SourceCodeOfOpenSourceSoftware
+/CrSDK_v2.01.00_20260203a_Win64.zip
+/CrSDK_API_Reference_v2.01.00.zip
+/*.pdf
 # SDK HTML 문서 변환본 (Sony 저작권 + 대용량)
 /html_md
 /docs_md
