@@ -72,18 +72,19 @@ git checkout windows-prep
 1. [x] `cargo build -p crsdk_server` — 빌드 통과 (wrapper.cpp `__builtin_memcpy`→`memcpy`, `LIBCLANG_PATH` 따옴표 이슈 해결)
 2. [x] 실행 → `Cr_Core.dll`·`CrAdapter\*.dll` 자동 복사·로드, SDK init OK, 8080 리슨, 웹 UI 서빙
 3. [x] **카메라 연결** → enum/connect OK, `"model":"ILCE-7C"` 정상, save path 설정 OK (§2.3 검증). ⚠️ **선결**: Windows는 Sony libusbK 드라이버(`Driver.zip`/§2.7) 설치 필요 + 카메라 USB 원격(PC Remote) ON
-4. [ ] 라이브뷰·촬영 스모크 테스트 (※ 서버 종료는 `/api/quit`로 graceful — force-kill하면 카메라 PC Remote 세션이 매달려 재연결 ConnectTimeout, USB 재연결 필요)
-5. [ ] 단일 인스턴스(§2.5)·종료 동작 확인
+4. [x] 촬영 스모크 — MF 전환 후 셔터 → `DSC00001.ARW`(≈47MB) PC 다운로드 확인. (AF는 캡 닫힘 시 락 실패 — 카메라 물리 상태) ※ 서버 종료는 `/api/quit` graceful 권장.
+5. [x] 단일 인스턴스(§2.5) — named mutex로 2번째 인스턴스 "already running" 후 종료, 1번째 유지 확인.
 
-## 4. 패키징 (1차)
-- `TetherMoon-win-x64.zip` = `crsdk_server.exe` + 모든 DLL(`Cr_Core.dll` + `CrAdapter\` + `libusb-1.0.dll` 등) + `web\` + README.txt
-- 미서명 → SmartScreen "추가 정보 → 실행" 안내. 아이콘은 `.ico`(달 사진)로 별도.
+## 4. 패키징 ✅ (`scripts/package-win.ps1`)
+- `cargo build --release` → `dist\TetherMoon-win-x64.zip` 생성: `crsdk_server.exe` + DLL(`Cr_Core.dll`·`monitor_protocol*.dll`) + `CrAdapter\`(Cr_PTP_*·libusb-1.0·libssh2) + `web\` + `driver\`(libusbK, `winusb_driver\` 있을 때) + `README.txt`.
+- 미서명 → SmartScreen "추가 정보 → 실행" 안내. 아이콘(.ico)은 추후.
 
 ## 5. 마무리
-- [ ] README에 Windows 설치 섹션
-- [ ] main 브랜치로 merge (검증 완료 후)
-- [ ] (선택) GitHub Actions windows-latest 빌드 — 단, SDK를 CI에 공개로 못 올리는 문제 고려
+- [x] README에 Windows 빌드/드라이버/패키징 섹션
+- [x] 저장경로 네이티브 폴더 다이얼로그(Browse) — `/api/savepath/browse`(mac osascript / win FolderBrowserDialog)
+- [x] `windows-prep` → `main` merge
+- [ ] (선택) 아이콘·코드서명, GitHub Actions windows 빌드(SDK는 CI 비공개 처리 필요)
 
 ---
 
-**현재 브랜치 상태**: Windows에서 **빌드+실행+실 A7C 연결+모델명/저장경로(CrChar) 검증 완료**(실측 머신). 코드 포팅 핵심 종료. 남은 건 (a) 라이브뷰·촬영 스모크(§3.4), (b) 단일 인스턴스 named mutex(§2.5, 선택), (c) 패키징(§4)·README(§5, libusbK 드라이버 절차 포함)·main merge. ※ Windows 사용자 선결: libusbK 드라이버 설치(§2.7) + 카메라 PC Remote ON.
+**현재 브랜치 상태**: Windows 포팅 **완료**(실 A7C로 빌드·드라이버·연결·문자열·촬영·다운로드·단일인스턴스·패키징·저장경로 피커 전부 검증). 단일 코드베이스로 macOS 동시 빌드. `main`에 merge됨. ※ Windows 사용자 선결: libusbK 드라이버 설치(§2.7) + 카메라 PC Remote ON.

@@ -135,6 +135,9 @@ cargo run -p crsdk_server     # http://localhost:8080/web/index.html
 - **문자열**: Windows `Cr_Core.dll`은 UNICODE 빌드 → `CrChar*`가 UTF-16. wrapper에서 `#if _WIN32`로 UTF-16↔UTF-8 변환(모델명/저장경로). macOS(UTF-8) 무변경.
 - ⚠️ **libusbK 디바이스 드라이버(사용자 1회 설치, 필수)**: macOS와 달리 Windows는 CrSDK가 libusb로 카메라를 잡으려면 Sony 동봉 **libusbK 드라이버**(`Driver.zip`/`srcameradriver.inf`)를 카메라 USB 인터페이스에 바인딩해야 함(없으면 기본 MTP 드라이버라 `enum=0`). 장치관리자 → 드라이버 업데이트 → **디스크 있음** → `srcameradriver.inf` → "install anyway"(Secure Boot off). 카메라는 **USB 원격(PC Remote) ON**.
 - **운영 교훈**: 서버 종료는 `/api/quit`(graceful). 강제 종료 시 카메라 PC Remote 세션이 매달려 재연결 ConnectTimeout → USB 재연결 필요.
+- **단일 인스턴스**: Windows는 named mutex(2번째 인스턴스는 그냥 종료, 기존이 카메라 유지). macOS는 기존 종료-후-교체.
+- **패키징**: `scripts\package-win.ps1` → `dist\TetherMoon-win-x64.zip`(exe+DLL+CrAdapter+web+driver+README). 실측: MF 셔터 → RAW PC 다운로드 확인.
+- **저장경로**: UI '찾아보기'(`/api/savepath/browse`)가 서버 PC의 OS 네이티브 폴더창을 띄움(mac osascript / win FolderBrowserDialog). 수동 경로 타이핑 불필요.
 
 ## 7. 바디 추상화 설계 (다음 작업 — capability 레이어)
 

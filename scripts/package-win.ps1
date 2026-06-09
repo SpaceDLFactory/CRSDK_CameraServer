@@ -14,6 +14,14 @@ Set-Location $root
 
 if (-not $env:LIBCLANG_PATH) { Write-Warning "LIBCLANG_PATH 미설정 — bindgen이 실패할 수 있음" }
 
+# 0) 실행 중인 인스턴스 정리 (dist\ DLL을 잡고 있으면 스테이징 삭제가 거부됨)
+if (Get-Process crsdk_server -ErrorAction SilentlyContinue) {
+    try { Invoke-WebRequest -UseBasicParsing -TimeoutSec 5 -Method Post "http://localhost:8080/api/quit" | Out-Null } catch {}
+    Start-Sleep 2
+    Get-Process crsdk_server -ErrorAction SilentlyContinue | Stop-Process -Force
+    Start-Sleep 1
+}
+
 # 1) 릴리스 빌드 (build.rs가 DLL을 target\release 옆에 복사)
 cargo build --release -p crsdk_server
 if ($LASTEXITCODE -ne 0) { throw "cargo build 실패" }
