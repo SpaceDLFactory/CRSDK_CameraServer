@@ -556,6 +556,7 @@
       </div>
       <div class="savepath">
         <input class="path-in" id="savePathIn" type="text" data-i18n-ph="ph.savepath" placeholder="PC save folder path" spellcheck="false">
+        <button class="btn path-browse" id="savePathBrowse" type="button" data-i18n="btn.browse">찾아보기</button>
         <button class="btn path-apply" id="savePathApply" type="button">SET</button>
       </div>
       <div class="savepath">
@@ -612,7 +613,7 @@
       'hint.bulb':'Sets the shutter to BULB for an N-second exposure (Manual mode required). For exposures longer than 30s.',
       'hint.interval':'Software interval. For RAW use interval ≥10s (download ~8s). MF recommended.',
       'hint.afpoint':'Tap the live view to focus; nudge with the D-pad / arrow keys.',
-      'ph.savepath':'PC save folder path','ph.prefix':'Filename prefix (e.g. SHOOT)',
+      'ph.savepath':'PC save folder path','ph.prefix':'Filename prefix (e.g. SHOOT)','btn.browse':'Browse…',
       'status.reconnect':'· click CAPTURE → retry connect',
       'dyn.exposing':'Exposing','dyn.bulbcaptured':'● BULB CAPTURED','dyn.interval':'Interval','dyn.stop':'Stop',
       'toast.saved':'Saved','toast.disconnected':'Camera disconnected','toast.sdkerr':'SDK error',
@@ -635,7 +636,7 @@
       'hint.bulb':'셔터를 BULB로 바꿔 N초 노출 (Manual 모드 필요). 30초 초과 장노출용',
       'hint.interval':'소프트웨어 인터벌. RAW는 간격 ≥10초 권장(다운로드 ~8s). 초점은 MF 권장',
       'hint.afpoint':'라이브뷰를 탭해서 포커스; D-pad·방향키로 미세 이동.',
-      'ph.savepath':'PC 저장 폴더 경로','ph.prefix':'파일명 접두사 (예: SHOOT)',
+      'ph.savepath':'PC 저장 폴더 경로','ph.prefix':'파일명 접두사 (예: SHOOT)','btn.browse':'찾아보기',
       'status.reconnect':'· click CAPTURE → /api/connect 재시도',
       'dyn.exposing':'노출중','dyn.bulbcaptured':'● 벌브 촬영','dyn.interval':'인터벌','dyn.stop':'정지',
       'toast.saved':'저장됨','toast.disconnected':'카메라 연결 끊김','toast.sdkerr':'SDK 오류',
@@ -658,7 +659,7 @@
       'hint.bulb':'シャッターを BULB にして N 秒露光（Manual モード必須）。30 秒超の長秒露光用。',
       'hint.interval':'ソフトウェアインターバル。RAW は間隔 ≥10 秒推奨（ダウンロード約 8 秒）。ピントは MF 推奨。',
       'hint.afpoint':'ライブビューをタップでフォーカス; D-pad・矢印キーで微調整。',
-      'ph.savepath':'PC 保存フォルダのパス','ph.prefix':'ファイル名プレフィックス（例: SHOOT）',
+      'ph.savepath':'PC 保存フォルダのパス','ph.prefix':'ファイル名プレフィックス（例: SHOOT）','btn.browse':'参照…',
       'status.reconnect':'· CAPTURE をクリック → 再接続',
       'dyn.exposing':'露出中','dyn.bulbcaptured':'● バルブ撮影','dyn.interval':'インターバル','dyn.stop':'停止',
       'toast.saved':'保存','toast.disconnected':'カメラ切断','toast.sdkerr':'SDK エラー',
@@ -1247,6 +1248,26 @@
   };
   savePathApply.addEventListener('click', applySavePath);
   savePathIn.addEventListener('keydown', e => { if (e.key === 'Enter') applySavePath(); });
+
+  // ── 네이티브 폴더 선택 → PC에 OS 폴더창 → 경로 채우고 바로 적용 ──────────
+  const savePathBrowse = document.getElementById('savePathBrowse');
+  savePathBrowse.addEventListener('click', async () => {
+    savePathBrowse.disabled = true;
+    const label = savePathBrowse.textContent;
+    savePathBrowse.textContent = '…';
+    try {
+      const r = await fetch('/api/savepath/browse', { method: 'POST' });
+      if (r.status === 200) {
+        savePathIn.value = (await r.text()).trim();
+        await applySavePath();           // 고른 즉시 적용
+      } // 204(취소)면 아무것도 안 함
+    } catch (e) {
+      console.warn('browse error', e);
+    } finally {
+      savePathBrowse.textContent = label;
+      savePathBrowse.disabled = false;
+    }
+  });
 
   pollProperties();
   setInterval(pollProperties, 2000);

@@ -476,6 +476,44 @@ async fn set_save_path(
     }
 }
 
+/// 저장 폴더를 OS 네이티브 폴더 선택창으로 고른다(서버=PC 쪽에 창이 뜸).
+/// 고른 절대경로를 반환만 하고 적용은 UI가 /api/savepath 로. 취소 시 204.
+async fn browse_save_path() -> impl IntoResponse {
+    let res = tokio::task::spawn_blocking(|| -> Option<String> {
+        #[cfg(target_os = "macos")]
+        {
+            let out = std::process::Command::new("osascript")
+                .args(["-e", "POSIX path of (choose folder with prompt \"TetherMoon: 저장 폴더 선택\")"])
+                .output().ok()?;
+            if !out.status.success() { return None; } // 취소 시 non-zero
+            let p = String::from_utf8_lossy(&out.stdout).trim().to_string();
+            if p.is_empty() { None } else { Some(p) }
+        }
+        #[cfg(target_os = "windows")]
+        {
+            // FolderBrowserDialog는 STA 필요. 한글 경로 위해 출력 UTF-8 강제.
+            let script = "[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; \
+                Add-Type -AssemblyName System.Windows.Forms; \
+                $d=New-Object System.Windows.Forms.FolderBrowserDialog; \
+                $d.Description='TetherMoon save folder'; \
+                if($d.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK){[Console]::Out.Write($d.SelectedPath)}";
+            let out = std::process::Command::new("powershell")
+                .args(["-NoProfile", "-STA", "-Command", script])
+                .output().ok()?;
+            let p = String::from_utf8_lossy(&out.stdout).trim().to_string();
+            if p.is_empty() { None } else { Some(p) }
+        }
+        #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+        { None }
+    }).await;
+
+    match res {
+        Ok(Some(path)) => (StatusCode::OK, path),
+        Ok(None) => (StatusCode::NO_CONTENT, String::new()),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, format!("task: {e}")),
+    }
+}
+
 async fn disconnect(State(s): State<AppState>) -> impl IntoResponse {
     // Camera Drop이 deactivate_callback → disconnect → release 순서로 실행
     *s.camera.lock().await = None;
@@ -1300,6 +1338,7 @@ async fn main() {
         .route("/api/properties", get(properties))
         .route("/api/property", post(set_property))
         .route("/api/savepath", post(set_save_path))
+        .route("/api/savepath/browse", post(browse_save_path))
         .route("/api/focus_nearfar", post(focus_near_far))
         .route("/api/focus_nearfar/info", get(focus_nearfar_info))
         .route("/api/capabilities", get(capabilities))
