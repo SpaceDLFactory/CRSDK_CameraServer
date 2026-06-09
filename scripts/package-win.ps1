@@ -37,6 +37,32 @@ Get-ChildItem $rel -Filter *.dll | Copy-Item -Destination $stage
 Copy-Item (Join-Path $rel "CrAdapter") $stage -Recurse
 Copy-Item (Join-Path $root "crsdk_server\web") (Join-Path $stage "web") -Recurse
 
+# 2b) VC++ 런타임 DLL을 exe 옆에 동봉 (app-local).
+#     exe와 Cr_Core.dll 모두 msvcp140/vcruntime140(_1)에 의존하는데, 이는 Windows 기본 포함이
+#     아니라 VC++ 재배포 패키지 소속 → 클린 머신에서 'VCRUNTIME140.dll 없음'으로 실행 실패.
+#     MS가 app-local 재배포를 허용하므로 빌드머신의 redist에서 복사한다(머신 비종속, vswhere 탐색).
+$crtNeeded = @("msvcp140.dll","vcruntime140.dll","vcruntime140_1.dll")
+$crtDir = $null
+$cands = @()
+if ($env:VCToolsRedistDir) { $cands += (Join-Path $env:VCToolsRedistDir "x64\Microsoft.VC*.CRT") }
+$vswhere = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio\Installer\vswhere.exe"
+if (Test-Path $vswhere) {
+    $vs = & $vswhere -products * -latest -property installationPath 2>$null
+    if ($vs) { $cands += (Join-Path $vs "VC\Redist\MSVC\*\x64\Microsoft.VC*.CRT") }
+}
+foreach ($c in $cands) {
+    $d = Get-ChildItem $c -Directory -ErrorAction SilentlyContinue |
+         Where-Object { Test-Path (Join-Path $_.FullName "vcruntime140.dll") } |
+         Select-Object -First 1
+    if ($d) { $crtDir = $d.FullName; break }
+}
+if ($crtDir) {
+    foreach ($d in $crtNeeded) { Copy-Item (Join-Path $crtDir $d) $stage -Force }
+    Write-Output ("VC++ runtime: " + $crtDir)
+} else {
+    Write-Warning "VC++ 런타임 DLL을 못 찾음 — 대상 PC에 VC++ 2015-2022 재배포(x64) 필요"
+}
+
 # 3) libusbK 드라이버 동봉 (winusb_driver\ 가 있으면 — Sony SDK의 Driver.zip 압축해제본)
 $drv = Join-Path $root "winusb_driver"
 if (Test-Path $drv) {

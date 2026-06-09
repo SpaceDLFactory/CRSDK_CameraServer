@@ -139,6 +139,7 @@ cargo run -p crsdk_server     # http://localhost:8080/web/index.html
 - **패키징**: `scripts\package-win.ps1` → `dist\TetherMoon-win-x64.zip`(exe+DLL+CrAdapter+web+driver+README). 실측: MF 셔터 → RAW PC 다운로드 확인.
 - **인스톨러**: `scripts\installer.iss`(Inno Setup) → `dist\TetherMoon-setup.exe`. 앱 설치 + libusbK 드라이버 자동 설치(인증서 TrustedPublisher 등록 + pnputil) + 바로가기/제거. 장치관리자 수동 단계 불필요.
 - **저장경로**: UI '찾아보기'(`/api/savepath/browse`)가 서버 PC의 OS 네이티브 폴더창을 띄움(mac osascript / win FolderBrowserDialog). 수동 경로 타이핑 불필요.
+- **DLL/경로 처리(크로스플랫폼)**: 라이브러리·경로·VC++ 런타임 동봉·CrAdapter 처리는 `ARCHITECTURE.md §9.1`에 정리. 핵심: Windows는 exe·Cr_Core가 VC++ 런타임(msvcp140/vcruntime140/_1) 의존 → `package-win.ps1`이 app-local 복사(클린 머신 대응).
 
 ## 7. 바디 추상화 설계 (다음 작업 — capability 레이어)
 

@@ -75,8 +75,10 @@ git checkout windows-prep
 4. [x] 촬영 스모크 — MF 전환 후 셔터 → `DSC00001.ARW`(≈47MB) PC 다운로드 확인. (AF는 캡 닫힘 시 락 실패 — 카메라 물리 상태) ※ 서버 종료는 `/api/quit` graceful 권장.
 5. [x] 단일 인스턴스(§2.5) — named mutex로 2번째 인스턴스 "already running" 후 종료, 1번째 유지 확인.
 
-## 4. 패키징 ✅ (`scripts/package-win.ps1`)
-- `cargo build --release` → `dist\TetherMoon-win-x64.zip` 생성: `crsdk_server.exe` + DLL(`Cr_Core.dll`·`monitor_protocol*.dll`) + `CrAdapter\`(Cr_PTP_*·libusb-1.0·libssh2) + `web\` + `driver\`(libusbK, `winusb_driver\` 있을 때) + `README.txt`.
+## 4. 패키징 ✅ (`scripts/package-win.ps1` + `scripts/installer.iss`)
+- `cargo build --release` → `dist\TetherMoon-win-x64.zip`: `crsdk_server.exe` + DLL(`Cr_Core.dll`·`monitor_protocol*.dll`) + **VC++ 런타임**(아래) + `CrAdapter\`(Cr_PTP_*·libusb-1.0·libssh2) + `web\` + `driver\`(libusbK + `sony_codesign.cer`) + `README.txt`.
+- **VC++ 런타임 의존성(중요)**: `dumpbin /dependents` 확인 결과 exe·`Cr_Core.dll` 모두 `msvcp140.dll`/`vcruntime140.dll`/`vcruntime140_1.dll`(VC++ 2015-2022 재배포) 필요. Windows 기본 미포함 → 클린 머신에서 'VCRUNTIME140.dll 없음'으로 실행 실패. `package-win.ps1`이 redist(vswhere로 탐색)에서 이 3개를 exe 옆에 **app-local 복사**해 자체완결. (Universal CRT `api-ms-win-crt-*`는 Win10+ 내장이라 불필요.)
+- **인스톨러**: `iscc scripts\installer.iss` → `dist\TetherMoon-setup.exe`. Program Files 설치 + Sony 인증서 TrustedPublisher 등록 + `pnputil`로 libusbK 자동 설치 + 바로가기/제거.
 - 미서명 → SmartScreen "추가 정보 → 실행" 안내. 아이콘(.ico)은 추후.
 
 ## 5. 마무리
