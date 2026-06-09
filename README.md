@@ -17,7 +17,9 @@ live view, and long-exposure/timelapse from any browser on your phone or PC.
 
 ## Quick start — just use it
 
-No building required. Grab the latest **[release](../../releases/latest)**:
+No building required. Grab the latest **[release](../../releases/latest)**.
+
+### macOS
 
 1. Download the `.dmg`, open it, and drag **TetherMoon** into Applications.
 2. Launch it. First time only: right-click the app → **Open** → **Open**.
@@ -25,6 +27,24 @@ No building required. Grab the latest **[release](../../releases/latest)**:
    *USB Connection Mode* → *PC Remote*). The console opens in your browser.
 4. To watch/control from a phone, open the LAN URL shown at the bottom of the
    page (phone must be on the same Wi-Fi).
+
+### Windows
+
+The Windows download is **portable and does not include the Sony SDK** (redistribution
+licensing). You supply the SDK files once:
+
+1. Download `TetherMoon-win-x64-portable.zip` and unzip it anywhere.
+2. Get the **Windows** [Sony Camera Remote SDK](https://support.d-imaging.sony.co.jp/app/sdk/en/index.html),
+   unzip `RemoteCli.zip`, and copy from `external\crsdk\` next to `crsdk_server.exe`:
+   `Cr_Core.dll`, `monitor_protocol*.dll`, and the whole `CrAdapter\` folder.
+3. Install the **libusbK driver** (one time): connect the A7C by USB with **PC Remote** on,
+   then Device Manager → *ILCE-…* → **Update driver** → *Have Disk* → the SDK's
+   `Driver.zip`→`srcameradriver.inf` → *Install anyway*.
+4. Run `crsdk_server.exe`. The console opens in your browser; the phone LAN URL is printed.
+
+> Details & troubleshooting: [`docs/WINDOWS-PORT.md`](docs/WINDOWS-PORT.md). Building the
+> Windows app (and a full installer that auto-installs the driver) is covered under
+> *Build → Windows* below.
 
 The rest of this README is for **building from source**.
 
