@@ -7,7 +7,7 @@
 ; 설치 시: 앱 파일 → Program Files, libusbK 드라이버 자동 설치(관리자), 바로가기/제거 등록.
 
 #define AppName "TetherMoon"
-#define AppVersion "0.2.4"
+#define AppVersion "0.2.5"
 #define AppExe "crsdk_server.exe"
 #define StageDir "..\dist\TetherMoon-win-x64"
 

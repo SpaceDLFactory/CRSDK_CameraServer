@@ -21,8 +21,8 @@
 #include <cstring>  // strlen
 #include <vector>   // UTF-8 → UTF-16 conversion
 #include <atomic>   // std::atomic for thread-safe callback deactivation
-#include <string>   // UTF-16 ↔ UTF-8 변환 버퍼 (Windows)
 #if defined(_WIN32)
+#include <string>    // UTF-16 ↔ UTF-8 변환 버퍼 (Windows 전용 — macOS libc++ <charconv> 회피)
 #include <windows.h> // WideCharToMultiByte / MultiByteToWideChar
 #endif
 
